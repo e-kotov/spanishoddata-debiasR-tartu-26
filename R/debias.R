@@ -76,34 +76,53 @@ measure_bias_metrics <- function(merged_dataset_or_df) {
   }
 }
 
-#' Measure coverage bias for every observed activity filter combination
+#' Measure coverage bias for every destination-purpose filter combination
 measure_activity_combo_bias <- function(mpd_raw, benchmark_clean) {
-  activity_flows <- mpd_raw |>
-    dplyr::transmute(
-      origin = as.character(id_origin),
-      activity_origin,
-      activity_destination,
-      flow = as.numeric(flow)
-    ) |>
-    dplyr::summarise(
-      user_count = sum(flow, na.rm = TRUE),
-      .by = c(activity_origin, activity_destination, origin)
-    )
+  purposes <- c("work_or_study", "infrequent_activity", "frequent_activity")
+  purpose_sets <- unlist(
+    lapply(
+      seq_along(purposes),
+      \(set_size) combn(purposes, set_size, simplify = FALSE)
+    ),
+    recursive = FALSE
+  )
 
-  coverage_df <- benchmark_clean |>
-    dplyr::transmute(origin = as.character(origin), population = target) |>
-    dplyr::inner_join(activity_flows, by = "origin") |>
-    dplyr::mutate(mpd_source = "MITMS")
+  benchmark <- benchmark_clean |>
+    dplyr::transmute(origin = as.character(origin), population = target)
 
-  coverage_df |>
-    dplyr::group_by(activity_origin, activity_destination) |>
-    dplyr::group_modify(~ debiasR::measure_bias(.x)) |>
-    dplyr::ungroup()
+  dplyr::bind_rows(lapply(purpose_sets, function(purpose_set) {
+    activity_flows <- mpd_raw |>
+      dplyr::filter(
+        activity_origin == "home",
+        activity_destination %in% purpose_set
+      ) |>
+      dplyr::transmute(
+        origin = as.character(id_origin),
+        flow = as.numeric(flow)
+      ) |>
+      dplyr::summarise(
+        user_count = sum(flow, na.rm = TRUE),
+        .by = origin
+      )
+
+    benchmark |>
+      dplyr::inner_join(activity_flows, by = "origin") |>
+      dplyr::mutate(mpd_source = "MITMS") |>
+      debiasR::measure_bias() |>
+      dplyr::mutate(
+        filter_id = paste(purpose_set, collapse = "+"),
+        filter_label = paste(
+          tools::toTitleCase(gsub("_", " ", purpose_set)),
+          collapse = " + "
+        ),
+        filter_size = length(purpose_set)
+      )
+  }))
 }
 
-#' Summarize activity-combination bias across municipalities and days
+#' Summarize destination-purpose filter bias across municipalities and days
 summarize_activity_combo_bias <- function(activity_combo_bias_combined) {
-  observed_summary <- activity_combo_bias_combined |>
+  activity_combo_bias_combined |>
     dplyr::summarise(
       median_bias = stats::median(coverage_bias, na.rm = TRUE),
       mean_bias = mean(coverage_bias, na.rm = TRUE),
@@ -111,7 +130,7 @@ summarize_activity_combo_bias <- function(activity_combo_bias_combined) {
       municipalities = dplyr::n_distinct(origin),
       days = dplyr::n_distinct(day),
       observations = dplyr::n(),
-      .by = c(activity_origin, activity_destination)
+      .by = c(filter_id, filter_label, filter_size)
     ) |>
     dplyr::mutate(
       representation = dplyr::case_when(
@@ -119,19 +138,8 @@ summarize_activity_combo_bias <- function(activity_combo_bias_combined) {
         median_bias > 0 ~ "Underrepresented",
         TRUE ~ "Matches benchmark"
       )
-    )
-
-  combination_grid <- expand.grid(
-    activity_origin = sort(unique(activity_combo_bias_combined$activity_origin)),
-    activity_destination = sort(unique(activity_combo_bias_combined$activity_destination)),
-    stringsAsFactors = FALSE
-  )
-
-  combination_grid |>
-    dplyr::left_join(
-      observed_summary,
-      by = c("activity_origin", "activity_destination")
-    )
+    ) |>
+    dplyr::arrange(filter_size, filter_label)
 }
 
 #' Merge and Calculate Population Coverage Bias (Vignette #4 Style)

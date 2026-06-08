@@ -60,7 +60,7 @@ plot_hourly_bias <- function(hourly_bias_combined) {
     )
 }
 
-#' Plot Daily Bias Distribution (Simple Violin + Boxplot)
+#' Plot Daily Coverage Score Distribution (Simple Violin + Boxplot)
 plot_daily_bias <- function(daily_bias_combined) {
   days_order <- rev(c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
   daily_bias_combined$day <- factor(daily_bias_combined$day, levels = days_order)
@@ -68,23 +68,21 @@ plot_daily_bias <- function(daily_bias_combined) {
   daily_bias_combined <- daily_bias_combined |>
     dplyr::mutate(day_type = ifelse(day %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
 
-  max_abs_bias <- max(abs(daily_bias_combined$coverage_bias), na.rm = TRUE)
-
-  ggplot(daily_bias_combined, aes(x = day, y = coverage_bias, fill = day_type)) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray60", linewidth = 0.5) +
+  ggplot(daily_bias_combined, aes(x = day, y = coverage_score, fill = day_type)) +
+    geom_hline(yintercept = 1, linetype = "dashed", color = "gray60", linewidth = 0.5) +
     # Full violin for simplicity
     geom_violin(alpha = 0.7, trim = FALSE, color = "black", linewidth = 0.4) +
     # Embedded boxplot
     geom_boxplot(width = 0.15, color = "black", fill = "white", alpha = 0.6, outlier.size = 2.5, outlier.alpha = 0.7) +
-    coord_flip(ylim = c(-max_abs_bias, max_abs_bias)) +
+    coord_flip(ylim = c(0, NA)) +
     theme_minimal(base_size = 24) +
     scale_x_discrete(labels = rev(c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))) +
     scale_y_continuous(n.breaks = 8) +
     scale_fill_manual(values = c("Weekday" = "#1F78B4", "Weekend" = "#E31A1C")) +
     labs(
       title = "Daily Capture Accuracy",
-      subtitle = "Relative discrepancy between MITMS trips and census benchmarks",
-      y = expression("Coverage bias, " * b[i]),
+      subtitle = "Coverage score: MITMS trips divided by census benchmark",
+      y = "Coverage Score\n(Ratio to Census)",
       x = "Day of\nWeek",
       caption = "Data Source: MITMS flows via {spanishoddata} vs. ECEPOV"
     ) +
@@ -172,57 +170,86 @@ plot_pop_vs_coverage_bias <- function(pop_coverage_combined) {
     )
 }
 
-#' Plot median coverage bias for every activity filter combination
-plot_activity_combo_bias <- function(activity_combo_summary) {
-  format_activity <- function(x) {
-    tools::toTitleCase(gsub("_", " ", x))
+#' Plot daily median coverage bias for every destination-purpose filter set
+plot_activity_combo_bias <- function(activity_combo_bias_combined, highlight_filter = NULL) {
+  days_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+  daily_summary <- activity_combo_bias_combined |>
+    dplyr::summarise(
+      median_bias = stats::median(coverage_bias, na.rm = TRUE),
+      .by = c(filter_label, filter_size, day)
+    ) |>
+    dplyr::mutate(
+      day = factor(day, levels = days_order),
+      filter_label = factor(
+        filter_label,
+        levels = unique(filter_label[order(filter_size, filter_label)])
+      ),
+      bias_label = sprintf("%.2f", median_bias),
+      is_highlight = !is.null(highlight_filter) & filter_label == highlight_filter,
+      text_color = ifelse(median_bias < -1, "white", "black"),
+      text_face = ifelse(is_highlight, "bold", "plain")
+    )
+
+  y_labels <- function(labels) {
+    parse(text = vapply(labels, function(label) {
+      quoted_label <- paste0("'", gsub("'", "\\\\'", label), "'")
+      if (!is.null(highlight_filter) && label == highlight_filter) {
+        paste0("bold(", quoted_label, ")")
+      } else {
+        quoted_label
+      }
+    }, character(1)))
   }
 
-  activity_combo_summary |>
-    dplyr::mutate(
-      bias_label = dplyr::if_else(
-        is.na(median_bias),
-        "No trips",
-        sprintf("%.2f", median_bias)
-      )
-    ) |>
+  daily_summary |>
     ggplot2::ggplot(
       ggplot2::aes(
-        x = activity_destination,
-        y = activity_origin,
+        x = day,
+        y = filter_label,
         fill = median_bias
       )
     ) +
     ggplot2::geom_tile(color = "white", linewidth = 1.2) +
-    ggplot2::geom_text(ggplot2::aes(label = bias_label), size = 6, fontface = "bold") +
-    ggplot2::scale_x_discrete(labels = format_activity) +
-    ggplot2::scale_y_discrete(labels = format_activity) +
+    ggplot2::geom_tile(
+      data = dplyr::filter(daily_summary, is_highlight),
+      fill = NA,
+      color = "black",
+      linewidth = 2.2
+    ) +
+    ggplot2::geom_text(
+      ggplot2::aes(label = bias_label, color = text_color, fontface = text_face),
+      size = 4.3
+    ) +
+    ggplot2::scale_color_identity() +
+    ggplot2::scale_x_discrete(labels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) +
+    ggplot2::scale_y_discrete(labels = y_labels) +
     ggplot2::scale_fill_gradient2(
-      low = "#D73027",
-      mid = "white",
-      high = "#4575B4",
+      low = "#5E3C99",
+      mid = "gray88",
+      high = "#E66101",
       midpoint = 0,
       limits = c(-2, 1),
       oob = scales::squish,
       na.value = "gray90",
       name = "Median bias\n< 0 overrepresented\n> 0 underrepresented"
     ) +
-    ggplot2::coord_equal() +
     ggplot2::labs(
-      title = "Bias by MITMS Activity Pair",
-      subtitle = "Each pair compared with the ECEPOV commuting benchmark",
-      x = "Activity at destination",
-      y = "Activity at origin",
-      caption = "Red: overrepresented | Blue: underrepresented"
+      title = "Bias by Purpose-Filter Combination",
+      subtitle = "All destination-purpose subsets; activity at origin = Home",
+      x = "Day of week",
+      y = "Destination filters",
+      caption = "Black outline marks the highlighted filter combination"
     ) +
-    ggplot2::theme_minimal(base_size = 22) +
+    ggplot2::theme_minimal(base_size = 20) +
     ggplot2::theme(
       panel.grid = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_text(angle = 30, hjust = 1, color = "black"),
+      axis.text.x = ggplot2::element_text(color = "black"),
       axis.text.y = ggplot2::element_text(color = "black"),
       axis.title = ggplot2::element_text(face = "bold"),
       plot.title = ggplot2::element_text(face = "bold", size = 28),
       plot.subtitle = ggplot2::element_text(size = 18, color = "gray40"),
+      plot.title.position = "plot",
       legend.title = ggplot2::element_text(size = 15),
       legend.text = ggplot2::element_text(size = 14)
     )

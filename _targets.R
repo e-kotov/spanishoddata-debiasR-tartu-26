@@ -90,7 +90,15 @@ daily_analysis <- tar_map(
   tar_target(daily_bias_total_work, measure_bias_metrics(daily_merged_dataset_work)),
 
   # --- 1C. FLOW ACCURACY BRANCH (DAILY - ALL) ---
-  tar_target(daily_mpd_raw_all, fetch_mpd(daily_dates, hourly = FALSE, purposes = "all")),
+  tar_target(
+    daily_mpd_raw_all,
+    fetch_mpd(
+      daily_dates,
+      hourly = FALSE,
+      purposes = "all",
+      group_activities = TRUE
+    )
+  ),
   tar_target(daily_mpd_clean_all, clean_mpd(daily_mpd_raw_all)),
   tar_target(
     daily_merged_dataset_all,
@@ -100,6 +108,10 @@ daily_analysis <- tar_map(
     )
   ),
   tar_target(daily_bias_total_all, measure_bias_metrics(daily_merged_dataset_all)),
+  tar_target(
+    daily_activity_combo_bias,
+    measure_activity_combo_bias(daily_mpd_raw_all, target_benchmark_clean)
+  ),
 
 
   # --- 2. HOURLY ACCURACY BRANCH (INDEPENDENT) ---
@@ -162,6 +174,17 @@ list(
       dplyr::mutate(day = gsub("daily_bias_total_all_", "", day_source))
   ),
 
+  tar_combine(
+    target_activity_combo_bias_combined,
+    daily_analysis$daily_activity_combo_bias,
+    command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
+      dplyr::mutate(day = gsub("daily_activity_combo_bias_", "", day_source))
+  ),
+
+  tar_target(
+    target_activity_combo_bias_summary,
+    summarize_activity_combo_bias(target_activity_combo_bias_combined)
+  ),
 
   # Combine Population Coverage Results
   tar_combine(
@@ -196,6 +219,29 @@ list(
       ggplot2::labs(subtitle = expression(atop("Relative discrepancy between MITMS trips and census benchmarks", paste("Filters: ", bold("None")))))
   ),
 
+  tar_target(
+    target_activity_combo_bias_plot,
+    plot_activity_combo_bias(
+      target_activity_combo_bias_combined,
+      highlight_filter = "Work or Study + Infrequent Activity"
+    )
+  ),
+
+  tar_target(
+    target_activity_combo_bias_work_plot,
+    plot_activity_combo_bias(
+      target_activity_combo_bias_combined,
+      highlight_filter = "Work or Study"
+    )
+  ),
+
+  tar_target(
+    target_activity_combo_bias_work_frequent_plot,
+    plot_activity_combo_bias(
+      target_activity_combo_bias_combined,
+      highlight_filter = "Work or Study + Frequent Activity"
+    )
+  ),
 
   tar_target(
     target_pop_coverage_plot,
@@ -272,6 +318,79 @@ list(
     format = "file"
   ),
 
+  tar_target(
+    target_activity_combo_bias_csv,
+    {
+      path <- "figures/activity_combo_bias_march_2023.csv"
+      utils::write.csv(target_activity_combo_bias_summary, path, row.names = FALSE)
+      path
+    },
+    format = "file"
+  ),
+
+  tar_target(
+    target_activity_combo_bias_png,
+    {
+      path <- "figures/activity_combo_bias_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_activity_combo_bias_plot,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
+
+  tar_target(
+    target_activity_combo_bias_best_png,
+    {
+      path <- "figures/activity_combo_bias_best_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_activity_combo_bias_plot,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
+
+  tar_target(
+    target_activity_combo_bias_work_png,
+    {
+      path <- "figures/activity_combo_bias_work_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_activity_combo_bias_work_plot,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
+
+  tar_target(
+    target_activity_combo_bias_work_frequent_png,
+    {
+      path <- "figures/activity_combo_bias_work_frequent_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_activity_combo_bias_work_frequent_plot,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
 
   tar_target(
     target_pop_coverage_png,

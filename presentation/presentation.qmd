@@ -14,8 +14,8 @@ format:
     show-slide-number: all
     preview-links: auto
     self-contained: true
-    transition: slide
-    background-transition: fade
+    transition: none
+    background-transition: none
     pdf-separate-fragments: true
 ---
 
@@ -60,38 +60,52 @@ format:
 
 <!-- ## Hourly Bias (March 2023)
 
-![Hourly bias metrics synthesized across all days in the study week.](../figures/hourly_bias_march_2023.png){#fig-hourly fig-align="center"} -->
-
-## Population Coverage Bias (March 2023)
-
-![Synthesis of daily bias metrics showing intra-week stability and variance.](../figures/pop_vs_coverage_bias_march_2023.png){#fig-daily fig-align="center"}
-
+![](../figures/hourly_bias_march_2023.png){fig-align="center"} -->
 
 ## Population Coverage (March 2023)
 
-![Municipality-level population coverage analysis.](../figures/population_coverage_march_2023.png){#fig-pop fig-align="center"}
+![](../figures/population_coverage_march_2023.png){fig-align="center"}
+
+
+## Population Coverage Bias (March 2023)
+
+![](../figures/pop_vs_coverage_bias_march_2023.png){fig-align="center"}
+
+
+## Daily Coverage Bias
+
+### (No Filters)
+
+![](../figures/daily_bias_all_march_2023.png){fig-align="center"}
 
 
 ## Daily Coverage Bias
 
 ### (home -> work/study)
 
-![](../figures/daily_bias_work_march_2023.png){#fig-daily fig-align="center"}
+![](../figures/daily_bias_work_march_2023.png){fig-align="center"}
 
 
 ## Daily Coverage Bias
 
 ### (home -> work/study + infreq)
 
-
-![](../figures/daily_bias_march_2023.png){#fig-daily fig-align="center"}
-
-## Daily Coverage Bias
-
-### (No Filters)
-
-![](../figures/daily_bias_all_march_2023.png){#fig-daily-all fig-align="center"}
+![](../figures/daily_bias_march_2023.png){fig-align="center"}
 
 ## Bias Across Activity Filters
 
-![Median bias for every MITMS activity-origin and activity-destination pair. Negative values indicate overrepresentation; positive values indicate underrepresentation relative to the census commuting benchmark.](../figures/activity_combo_bias_march_2023.png){#fig-activity-combo-bias fig-align="center"}
+### Work/study only
+
+![](../figures/activity_combo_bias_work_march_2023.png){fig-align="center"}
+
+## Bias Across Activity Filters
+
+### Work/study + frequent
+
+![](../figures/activity_combo_bias_work_frequent_march_2023.png){fig-align="center"}
+
+## Bias Across Activity Filters
+
+### Best match: work/study + infrequent
+
+![](../figures/activity_combo_bias_best_march_2023.png){fig-align="center"}
