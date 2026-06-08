@@ -89,6 +89,18 @@ daily_analysis <- tar_map(
   ),
   tar_target(daily_bias_total_work, measure_bias_metrics(daily_merged_dataset_work)),
 
+  # --- 1C. FLOW ACCURACY BRANCH (DAILY - ALL) ---
+  tar_target(daily_mpd_raw_all, fetch_mpd(daily_dates, hourly = FALSE, purposes = "all")),
+  tar_target(daily_mpd_clean_all, clean_mpd(daily_mpd_raw_all)),
+  tar_target(
+    daily_merged_dataset_all,
+    merge_datasets(
+      daily_mpd_clean_all,
+      target_benchmark_clean
+    )
+  ),
+  tar_target(daily_bias_total_all, measure_bias_metrics(daily_merged_dataset_all)),
+
 
   # --- 2. HOURLY ACCURACY BRANCH (INDEPENDENT) ---
   tar_target(
@@ -143,6 +155,13 @@ list(
       dplyr::mutate(day = gsub("daily_bias_total_work_", "", day_source))
   ),
 
+  tar_combine(
+    target_daily_bias_combined_all,
+    daily_analysis$daily_bias_total_all,
+    command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
+      dplyr::mutate(day = gsub("daily_bias_total_all_", "", day_source))
+  ),
+
 
   # Combine Population Coverage Results
   tar_combine(
@@ -171,10 +190,21 @@ list(
       ggplot2::labs(subtitle = expression(atop("Relative discrepancy between MITMS trips and census benchmarks", paste("Filters: ", bold("Work or Study Only")))))
   ),
 
+  tar_target(
+    target_daily_bias_plot_all,
+    plot_daily_bias(target_daily_bias_combined_all) +
+      ggplot2::labs(subtitle = expression(atop("Relative discrepancy between MITMS trips and census benchmarks", paste("Filters: ", bold("None")))))
+  ),
+
 
   tar_target(
     target_pop_coverage_plot,
     plot_population_coverage(target_pop_coverage_combined)
+  ),
+
+  tar_target(
+    target_pop_vs_coverage_plot,
+    plot_pop_vs_coverage_bias(target_pop_coverage_combined)
   ),
 
   # Save PNG files (Standardized to width=12, height=8)
@@ -226,6 +256,22 @@ list(
     format = "file"
   ),
 
+  tar_target(
+    target_daily_bias_all_png,
+    {
+      path <- "figures/daily_bias_all_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_daily_bias_plot_all,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
+
 
   tar_target(
     target_pop_coverage_png,
@@ -234,6 +280,22 @@ list(
       ggplot2::ggsave(
         path,
         target_pop_coverage_plot,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
+
+  tar_target(
+    target_pop_vs_coverage_png,
+    {
+      path <- "figures/pop_vs_coverage_bias_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_pop_vs_coverage_plot,
         width = 12,
         height = 8,
         dpi = 300

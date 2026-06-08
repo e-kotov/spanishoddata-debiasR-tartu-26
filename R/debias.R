@@ -61,7 +61,6 @@ measure_bias_metrics <- function(merged_dataset_or_df) {
   # Helper to calculate relative error (Directional)
   calc_relative_error <- function(df) {
     res <- debiasR::measure_bias(df)
-    res$bias <- (res$population - res$user_count) / res$population
     return(res)
   }
 
@@ -75,6 +74,64 @@ measure_bias_metrics <- function(merged_dataset_or_df) {
   } else {
     return(calc_relative_error(coverage_df))
   }
+}
+
+#' Measure coverage bias for every observed activity filter combination
+measure_activity_combo_bias <- function(mpd_raw, benchmark_clean) {
+  activity_flows <- mpd_raw |>
+    dplyr::transmute(
+      origin = as.character(id_origin),
+      activity_origin,
+      activity_destination,
+      flow = as.numeric(flow)
+    ) |>
+    dplyr::summarise(
+      user_count = sum(flow, na.rm = TRUE),
+      .by = c(activity_origin, activity_destination, origin)
+    )
+
+  coverage_df <- benchmark_clean |>
+    dplyr::transmute(origin = as.character(origin), population = target) |>
+    dplyr::inner_join(activity_flows, by = "origin") |>
+    dplyr::mutate(mpd_source = "MITMS")
+
+  coverage_df |>
+    dplyr::group_by(activity_origin, activity_destination) |>
+    dplyr::group_modify(~ debiasR::measure_bias(.x)) |>
+    dplyr::ungroup()
+}
+
+#' Summarize activity-combination bias across municipalities and days
+summarize_activity_combo_bias <- function(activity_combo_bias_combined) {
+  observed_summary <- activity_combo_bias_combined |>
+    dplyr::summarise(
+      median_bias = stats::median(coverage_bias, na.rm = TRUE),
+      mean_bias = mean(coverage_bias, na.rm = TRUE),
+      median_coverage_ratio = stats::median(coverage_score, na.rm = TRUE),
+      municipalities = dplyr::n_distinct(origin),
+      days = dplyr::n_distinct(day),
+      observations = dplyr::n(),
+      .by = c(activity_origin, activity_destination)
+    ) |>
+    dplyr::mutate(
+      representation = dplyr::case_when(
+        median_bias < 0 ~ "Overrepresented",
+        median_bias > 0 ~ "Underrepresented",
+        TRUE ~ "Matches benchmark"
+      )
+    )
+
+  combination_grid <- expand.grid(
+    activity_origin = sort(unique(activity_combo_bias_combined$activity_origin)),
+    activity_destination = sort(unique(activity_combo_bias_combined$activity_destination)),
+    stringsAsFactors = FALSE
+  )
+
+  combination_grid |>
+    dplyr::left_join(
+      observed_summary,
+      by = c("activity_origin", "activity_destination")
+    )
 }
 
 #' Merge and Calculate Population Coverage Bias (Vignette #4 Style)

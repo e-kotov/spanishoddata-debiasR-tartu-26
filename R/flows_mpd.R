@@ -1,5 +1,10 @@
 #' Fetch Mobile Phone Mobility Data
-fetch_mpd <- function(dates, hourly = FALSE, purposes = c("work_or_study", "infrequent_activity")) {
+fetch_mpd <- function(
+  dates,
+  hourly = FALSE,
+  purposes = c("work_or_study", "infrequent_activity"),
+  group_activities = FALSE
+) {
   configure_data_cache()
   res <- spanishoddata::spod_get(type = "od", zones = "muni", dates = dates, max_download_size_gb = 5)
 
@@ -11,13 +16,23 @@ fetch_mpd <- function(dates, hourly = FALSE, purposes = c("work_or_study", "infr
   if (hourly) {
     group_cols <- c(group_cols, "hour")
   }
+  if (group_activities) {
+    group_cols <- c(group_cols, "activity_origin", "activity_destination")
+  }
 
-  # Filter for home-to-work_or_study or infrequent_activity commutes and average daily flow
-  res_processed <- res |>
-    dplyr::filter(activity_origin == "home", activity_destination %in% purposes) |>
-    dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) |>
-    dplyr::summarise(flow = sum(n_trips, na.rm = TRUE) / !!num_days, .groups = "drop") |>
-    dplyr::collect()
+  # Filter for commutes and average daily flow
+  if (is.null(purposes) || "all" %in% purposes) {
+    res_processed <- res |>
+      dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) |>
+      dplyr::summarise(flow = sum(n_trips, na.rm = TRUE) / !!num_days, .groups = "drop") |>
+      dplyr::collect()
+  } else {
+    res_processed <- res |>
+      dplyr::filter(activity_origin == "home", activity_destination %in% purposes) |>
+      dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) |>
+      dplyr::summarise(flow = sum(n_trips, na.rm = TRUE) / !!num_days, .groups = "drop") |>
+      dplyr::collect()
+  }
 
   res_processed
 }
@@ -35,6 +50,12 @@ clean_mpd <- function(mpd_raw) {
 
   if ("hour" %in% colnames(mpd_raw)) {
     res$hour <- mpd_raw$hour
+  }
+  if ("activity_origin" %in% colnames(mpd_raw)) {
+    res$activity_origin <- mpd_raw$activity_origin
+  }
+  if ("activity_destination" %in% colnames(mpd_raw)) {
+    res$activity_destination <- mpd_raw$activity_destination
   }
 
   res

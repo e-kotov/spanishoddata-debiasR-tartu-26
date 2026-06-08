@@ -13,3 +13,6 @@ presentation/.quarto/
 presentation/*_files/
 *.pdf
 *.html
+
+
+resources/
