@@ -1,0 +1,15 @@
+_targets/
+data-cache/
+renv/library/
+renv/local/
+renv/staging/
+
+*.Rproj.user
+.Rhistory
+.RData
+.DS_Store
+
+presentation/.quarto/
+presentation/*_files/
+*.pdf
+*.html

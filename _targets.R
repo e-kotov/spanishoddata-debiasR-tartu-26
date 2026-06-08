@@ -1,0 +1,198 @@
+library(targets)
+library(tarchetypes)
+
+# targets::tar_visnetwork()
+# targets::tar_make()
+
+# Source all custom functions
+tar_source("R/")
+
+# Set target options
+tar_option_set(
+  packages = c(
+    "spanishoddata",
+    "ineAtlas",
+    "ineapir",
+    "debiasR",
+    "dplyr",
+    "dbplyr",
+    "sf",
+    "ggplot2",
+    "ggdist"
+  ),
+  format = "rds"
+)
+
+# Helper for day-specific dates in March 2023
+day_dates <- data.frame(
+  day = c(
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday"
+  ),
+  date_start = c(
+    "2023-03-06",
+    "2023-03-07",
+    "2023-03-08",
+    "2023-03-09",
+    "2023-03-10",
+    "2023-03-11",
+    "2023-03-12"
+  ),
+  date_end = c(
+    "2023-03-06",
+    "2023-03-07",
+    "2023-03-08",
+    "2023-03-09",
+    "2023-03-10",
+    "2023-03-11",
+    "2023-03-12"
+  ),
+  stringsAsFactors = FALSE
+)
+
+# Define the mapped analysis targets
+daily_analysis <- tar_map(
+  values = day_dates,
+  names = day,
+
+  # --- FLOW ACCURACY BRANCH ---
+  tar_target(daily_dates, c(start = date_start, end = date_end)),
+  tar_target(daily_mpd_raw, fetch_mpd(daily_dates, hourly = TRUE)),
+
+  tar_target(daily_mpd_clean, clean_mpd(daily_mpd_raw)),
+
+  # --- 1. FLOW ACCURACY BRANCH (DAILY) ---
+  tar_target(
+    daily_merged_dataset,
+    merge_datasets(
+      daily_mpd_clean,
+      target_benchmark_clean
+    )
+  ),
+
+  tar_target(daily_bias_total, measure_bias_metrics(daily_merged_dataset)),
+
+  # --- 2. HOURLY ACCURACY BRANCH (INDEPENDENT) ---
+  tar_target(
+    daily_merged_hourly,
+    merge_hourly_accuracy(daily_mpd_clean, target_benchmark_clean)
+  ),
+
+  tar_target(daily_bias_metrics, measure_bias_metrics(daily_merged_hourly)),
+
+  # --- 3. POPULATION COVERAGE BRANCH ---
+  tar_target(daily_mitms_pop_raw, fetch_mitms_population(daily_dates)),
+  tar_target(
+    daily_pop_coverage,
+    merge_population_coverage(daily_mitms_pop_raw, target_census_population)
+  )
+)
+
+list(
+  # --- Common Targets (Same for all days) ---
+  tar_target(target_zones_raw, fetch_zones()),
+  tar_target(target_census_population, fetch_census_population()),
+  tar_target(target_benchmark_raw, fetch_benchmarks()),
+
+  tar_target(
+    target_benchmark_clean,
+    clean_benchmarks(target_benchmark_raw, target_zones_raw)
+  ),
+
+  # --- Daily Analysis (the tar_map output) ---
+  daily_analysis,
+
+  # --- Synthesis & Visualization ---
+  # Combine Flow Results
+  tar_combine(
+    target_hourly_bias_combined,
+    daily_analysis$daily_bias_metrics,
+    command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
+      dplyr::mutate(day = gsub("daily_bias_metrics_", "", day_source))
+  ),
+
+  tar_combine(
+    target_daily_bias_combined,
+    daily_analysis$daily_bias_total,
+    command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
+      dplyr::mutate(day = gsub("daily_bias_total_", "", day_source))
+  ),
+
+  # Combine Population Coverage Results
+  tar_combine(
+    target_pop_coverage_combined,
+    daily_analysis$daily_pop_coverage,
+    command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
+      dplyr::mutate(day = gsub("daily_pop_coverage_", "", day_source))
+  ),
+
+  # Generate final plots
+  tar_target(
+    target_hourly_bias_plot,
+    plot_hourly_bias(target_hourly_bias_combined)
+  ),
+
+  tar_target(
+    target_daily_bias_plot,
+    plot_daily_bias(target_daily_bias_combined)
+  ),
+
+  tar_target(
+    target_pop_coverage_plot,
+    plot_population_coverage(target_pop_coverage_combined)
+  ),
+
+  # Save PNG files (Standardized to width=12, height=8)
+  tar_target(
+    target_hourly_bias_png,
+    {
+      path <- "figures/hourly_bias_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_hourly_bias_plot,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
+
+  tar_target(
+    target_daily_bias_png,
+    {
+      path <- "figures/daily_bias_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_daily_bias_plot,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
+
+  tar_target(
+    target_pop_coverage_png,
+    {
+      path <- "figures/population_coverage_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_pop_coverage_plot,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  )
+)

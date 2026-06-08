@@ -1,0 +1,73 @@
+/* custom.scss */
+/*-- scss:defaults --*/
+
+$body-bg: #F4F6F6;
+$body-color: #1C2833;
+$link-color: #2E4053;
+$selection-bg: #AAB7B8;
+
+$heading-color: #1C2833;
+$presentation-heading-font: "Source Sans Pro", Helvetica, sans-serif;
+$presentation-body-font: "Source Sans Pro", Helvetica, sans-serif;
+
+/*-- scss:rules --*/
+
+.reveal h1, .reveal h2, .reveal h3 {
+  text-transform: none;
+}
+
+.reveal .slides section {
+  text-align: left;
+}
+
+.card {
+  background: #FFFFFF;
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  border: 1px solid #EAECEE;
+  display: flex;
+  flex-direction: column;
+}
+
+.card h3 {
+  margin-top: 0 !important;
+  color: #2E4053 !important;
+  border-bottom: 2px solid #F2F4F4;
+  padding-bottom: 15px;
+  margin-bottom: 20px !important;
+  font-size: 1.2em !important;
+}
+
+.package-box {
+  text-align: center;
+  p {
+    margin-top: 10px !important;
+    font-size: 0.7em !important;
+    font-weight: 600;
+    color: #566573;
+    font-family: "Courier New", Courier, monospace;
+  }
+}
+
+.reveal .section-divider {
+  text-align: center;
+  h2 {
+    font-size: 3em;
+  }
+}
+
+.footnote {
+  position: absolute;
+  bottom: 20px;
+  font-size: 0.5em;
+  color: #666;
+}
+
+.glass-box {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
+  padding: 20px 40px !important;
+  border-radius: 10px;
+  display: inline-block;
+}

@@ -1,0 +1,71 @@
+---
+title: "Daily Mobility Validation"
+subtitle: "Biases in Spanish Open Mobility Data"
+author:
+  - "Simone Aumann"
+  - "Helena Gartmeier"
+  - "Egor Kotov"
+date: today
+format:
+  revealjs:
+    theme: [default, custom.scss]
+    footer: "Biases in Spanish Open Mobility Data"
+    slide-number: true
+    show-slide-number: all
+    preview-links: auto
+    self-contained: true
+    transition: slide
+    background-transition: fade
+    pdf-separate-fragments: true
+---
+
+## Data and Methods {vertical-align="center"}
+
+```{=html}
+<div style="text-align: center;">
+<br>
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; align-items: start;">
+  <div style="padding: 5px; margin: 0 5px;">
+    <img src="media/spanishoddata-logo.png" style="height: 110px; width: auto; display: block; margin: 0 auto 10px;">
+    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Mobility Data</div>
+    <div style="font-size: 0.65em; font-family: monospace; color: #566573;">{spanishoddata}</div>
+  </div>
+
+  <div style="padding: 5px; margin: 0 5px;">
+    <img src="media/ineapir-logo.png" style="height: 110px; width: auto; display: block; margin: 0 auto 10px;">
+    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Census Commuting</div>
+    <div style="font-size: 0.65em; font-family: monospace; color: #566573;">{ineapir}</div>
+  </div>
+
+  <div style="padding: 5px; margin: 0 5px;">
+    <img src="media/ineAtlas-logo.png" style="height: 110px; width: auto; display: block; margin: 0 auto 10px;">
+    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Population Benchmark</div>
+    <div style="font-size: 0.65em; font-family: monospace; color: #566573;">{ineAtlas}</div>
+  </div>
+
+  <div style="padding: 5px; margin: 0 5px;">
+    <img src="media/debiasR-logo.png" style="height: 110px; width: auto; display: block; margin: 0 auto 10px;">
+    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Bias Measurement</div>
+    <div style="font-size: 0.65em; font-family: monospace; color: #566573;">{debiasR}</div>
+  </div>
+</div>
+</div>
+```
+
+## [Entire Country]{.glass-box} {background-color="black" background-image="media/spain-folding-flows.gif" background-size="contain"}
+
+## [5 years of hourly OD matrices]{.glass-box} {background-color="black" background-image="media/barcelona-time.gif" background-size="contain"}
+
+## Results
+
+## Hourly Bias (March 2023)
+
+![Hourly bias metrics synthesized across all days in the study week.](../figures/hourly_bias_march_2023.png){#fig-hourly fig-align="center"}
+
+## Daily Bias (March 2023)
+
+![Synthesis of daily bias metrics showing intra-week stability and variance.](../figures/daily_bias_march_2023.png){#fig-daily fig-align="center"}
+
+## Population Coverage (March 2023)
+
+![Municipality-level population coverage analysis.](../figures/population_coverage_march_2023.png){#fig-pop fig-align="center"}
