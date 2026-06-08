@@ -77,6 +77,19 @@ daily_analysis <- tar_map(
 
   tar_target(daily_bias_total, measure_bias_metrics(daily_merged_dataset)),
 
+  # --- 1B. FLOW ACCURACY BRANCH (DAILY - WORK OR STUDY) ---
+  tar_target(daily_mpd_raw_work, fetch_mpd(daily_dates, hourly = FALSE, purposes = "work_or_study")),
+  tar_target(daily_mpd_clean_work, clean_mpd(daily_mpd_raw_work)),
+  tar_target(
+    daily_merged_dataset_work,
+    merge_datasets(
+      daily_mpd_clean_work,
+      target_benchmark_clean
+    )
+  ),
+  tar_target(daily_bias_total_work, measure_bias_metrics(daily_merged_dataset_work)),
+
+
   # --- 2. HOURLY ACCURACY BRANCH (INDEPENDENT) ---
   tar_target(
     daily_merged_hourly,
@@ -123,6 +136,14 @@ list(
       dplyr::mutate(day = gsub("daily_bias_total_", "", day_source))
   ),
 
+  tar_combine(
+    target_daily_bias_combined_work,
+    daily_analysis$daily_bias_total_work,
+    command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
+      dplyr::mutate(day = gsub("daily_bias_total_work_", "", day_source))
+  ),
+
+
   # Combine Population Coverage Results
   tar_combine(
     target_pop_coverage_combined,
@@ -132,15 +153,24 @@ list(
   ),
 
   # Generate final plots
-  tar_target(
-    target_hourly_bias_plot,
-    plot_hourly_bias(target_hourly_bias_combined)
-  ),
+  # tar_target(
+  #   target_hourly_bias_plot,
+  #   plot_hourly_bias(target_hourly_bias_combined) +
+  #     ggplot2::labs(subtitle = "Hourly capture intensity vs. census average\nFilters: Work/Study & Infrequent Activity")
+  # ),
 
   tar_target(
     target_daily_bias_plot,
-    plot_daily_bias(target_daily_bias_combined)
+    plot_daily_bias(target_daily_bias_combined) +
+      ggplot2::labs(subtitle = expression(atop("Relative discrepancy between MITMS trips and census benchmarks", paste("Filters: ", bold("Work/Study & Infrequent Activity")))))
   ),
+
+  tar_target(
+    target_daily_bias_plot_work,
+    plot_daily_bias(target_daily_bias_combined_work) +
+      ggplot2::labs(subtitle = expression(atop("Relative discrepancy between MITMS trips and census benchmarks", paste("Filters: ", bold("Work or Study Only")))))
+  ),
+
 
   tar_target(
     target_pop_coverage_plot,
@@ -148,21 +178,21 @@ list(
   ),
 
   # Save PNG files (Standardized to width=12, height=8)
-  tar_target(
-    target_hourly_bias_png,
-    {
-      path <- "figures/hourly_bias_march_2023.png"
-      ggplot2::ggsave(
-        path,
-        target_hourly_bias_plot,
-        width = 12,
-        height = 8,
-        dpi = 300
-      )
-      path
-    },
-    format = "file"
-  ),
+  # tar_target(
+  #   target_hourly_bias_png,
+  #   {
+  #     path <- "figures/hourly_bias_march_2023.png"
+  #     ggplot2::ggsave(
+  #       path,
+  #       target_hourly_bias_plot,
+  #       width = 12,
+  #       height = 8,
+  #       dpi = 300
+  #     )
+  #     path
+  #   },
+  #   format = "file"
+  # ),
 
   tar_target(
     target_daily_bias_png,
@@ -179,6 +209,23 @@ list(
     },
     format = "file"
   ),
+
+  tar_target(
+    target_daily_bias_work_png,
+    {
+      path <- "figures/daily_bias_work_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_daily_bias_plot_work,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
+
 
   tar_target(
     target_pop_coverage_png,

@@ -1,5 +1,5 @@
 #' Fetch Mobile Phone Mobility Data
-fetch_mpd <- function(dates, hourly = FALSE) {
+fetch_mpd <- function(dates, hourly = FALSE, purposes = c("work_or_study", "infrequent_activity")) {
   configure_data_cache()
   res <- spanishoddata::spod_get(type = "od", zones = "muni", dates = dates, max_download_size_gb = 5)
 
@@ -14,7 +14,7 @@ fetch_mpd <- function(dates, hourly = FALSE) {
 
   # Filter for home-to-work_or_study or infrequent_activity commutes and average daily flow
   res_processed <- res |>
-    dplyr::filter(activity_origin == "home", activity_destination %in% c("work_or_study", "infrequent_activity")) |>
+    dplyr::filter(activity_origin == "home", activity_destination %in% purposes) |>
     dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) |>
     dplyr::summarise(flow = sum(n_trips, na.rm = TRUE) / !!num_days, .groups = "drop") |>
     dplyr::collect()

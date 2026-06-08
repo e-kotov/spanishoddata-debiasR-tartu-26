@@ -58,9 +58,9 @@ format:
 
 ## Results
 
-## Hourly Bias (March 2023)
+<!-- ## Hourly Bias (March 2023)
 
-![Hourly bias metrics synthesized across all days in the study week.](../figures/hourly_bias_march_2023.png){#fig-hourly fig-align="center"}
+![Hourly bias metrics synthesized across all days in the study week.](../figures/hourly_bias_march_2023.png){#fig-hourly fig-align="center"} -->
 
 ## Daily Bias (March 2023)
 
