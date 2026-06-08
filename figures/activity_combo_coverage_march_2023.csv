@@ -1,0 +1,8 @@
+"filter_id","filter_label","filter_size","median_coverage","mean_coverage","municipalities","days","observations","representation"
+"frequent_activity","Frequent Activity",1,1.49271722399151,1.48821939456199,151,7,1057,"Overrepresented"
+"infrequent_activity","Infrequent Activity",1,0.403816659970537,0.430036102210766,151,7,1057,"Underrepresented"
+"work_or_study","Work or Study",1,0.532352592488225,0.507984781489691,151,7,1057,"Underrepresented"
+"infrequent_activity+frequent_activity","Infrequent Activity + Frequent Activity",2,1.90755360949473,1.91825549677276,151,7,1057,"Overrepresented"
+"work_or_study+frequent_activity","Work or Study + Frequent Activity",2,2.03147640138408,1.99620417605168,151,7,1057,"Overrepresented"
+"work_or_study+infrequent_activity","Work or Study + Infrequent Activity",2,0.931668529615119,0.938020883700458,151,7,1057,"Underrepresented"
+"work_or_study+infrequent_activity+frequent_activity","Work or Study + Infrequent Activity + Frequent Activity",3,2.4368545505037,2.42624027826245,151,7,1057,"Overrepresented"

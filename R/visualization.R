@@ -3,18 +3,18 @@ library(dplyr)
 library(ggdist)
 
 #' Plot Hourly Capture Rates across Days (Capture Score Ratio)
-plot_hourly_bias <- function(hourly_bias_combined) {
+plot_hourly_coverage_score <- function(hourly_coverage_combined) {
   # Ensure day is a factor with correct order
   days_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-  hourly_bias_combined$day <- factor(hourly_bias_combined$day, levels = days_order)
+  hourly_coverage_combined$day <- factor(hourly_coverage_combined$day, levels = days_order)
 
   # Categorize days
-  hourly_bias_combined <- hourly_bias_combined |>
+  hourly_coverage_combined <- hourly_coverage_combined |>
     dplyr::mutate(day_type = ifelse(day %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
 
   # Calculate Capture Score: (Actual Hourly Trips) / (Average Hourly Census Benchmark)
   # 1.0 means exactly 1/24th of the daily census total was captured in this hour.
-  hourly_profile <- hourly_bias_combined
+  hourly_profile <- hourly_coverage_combined
 
   # Temporal Profile Plot (Projector-Ready)
   ggplot(hourly_profile, aes(x = hour, y = coverage_score, color = day_type, fill = day_type)) +
@@ -61,23 +61,29 @@ plot_hourly_bias <- function(hourly_bias_combined) {
 }
 
 #' Plot Daily Coverage Score Distribution (Simple Violin + Boxplot)
-plot_daily_bias <- function(daily_bias_combined) {
+plot_daily_coverage_score <- function(daily_coverage_combined, max_x = 2) {
   days_order <- rev(c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
-  daily_bias_combined$day <- factor(daily_bias_combined$day, levels = days_order)
+  daily_coverage_combined$day <- factor(daily_coverage_combined$day, levels = days_order)
 
-  daily_bias_combined <- daily_bias_combined |>
+  daily_coverage_combined <- daily_coverage_combined |>
     dplyr::mutate(day_type = ifelse(day %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
 
-  ggplot(daily_bias_combined, aes(x = day, y = coverage_score, fill = day_type)) +
+  if (max_x <= 2) {
+    x_breaks <- seq(0, max_x, by = 0.5)
+  } else {
+    x_breaks <- sort(unique(c(0, 1, seq(0, max_x, by = 2))))
+  }
+
+  ggplot(daily_coverage_combined, aes(x = day, y = coverage_score, fill = day_type)) +
     geom_hline(yintercept = 1, linetype = "dashed", color = "gray60", linewidth = 0.5) +
     # Full violin for simplicity
     geom_violin(alpha = 0.7, trim = FALSE, color = "black", linewidth = 0.4) +
     # Embedded boxplot
     geom_boxplot(width = 0.15, color = "black", fill = "white", alpha = 0.6, outlier.size = 2.5, outlier.alpha = 0.7) +
-    coord_flip(ylim = c(0, NA)) +
+    coord_flip(ylim = c(0, max_x)) +
     theme_minimal(base_size = 24) +
     scale_x_discrete(labels = rev(c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))) +
-    scale_y_continuous(n.breaks = 8) +
+    scale_y_continuous(breaks = x_breaks) +
     scale_fill_manual(values = c("Weekday" = "#1F78B4", "Weekend" = "#E31A1C")) +
     labs(
       title = "Daily Capture Accuracy",
@@ -135,8 +141,8 @@ plot_population_coverage <- function(pop_coverage_combined) {
     )
 }
 
-#' Plot Population vs Coverage Bias
-plot_pop_vs_coverage_bias <- function(pop_coverage_combined) {
+#' Plot Population vs Coverage Score
+plot_pop_vs_coverage_score <- function(pop_coverage_combined) {
   days_order <- rev(c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
   pop_coverage_combined$day <- factor(pop_coverage_combined$day, levels = days_order)
   pop_coverage_combined <- pop_coverage_combined |>
@@ -170,13 +176,13 @@ plot_pop_vs_coverage_bias <- function(pop_coverage_combined) {
     )
 }
 
-#' Plot daily median coverage bias for every destination-purpose filter set
-plot_activity_combo_bias <- function(activity_combo_bias_combined, highlight_filter = NULL) {
+#' Plot daily median coverage score for every destination-purpose filter set
+plot_activity_combo_coverage <- function(activity_combo_coverage_combined, highlight_filter = NULL) {
   days_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
-  daily_summary <- activity_combo_bias_combined |>
+  daily_summary <- activity_combo_coverage_combined |>
     dplyr::summarise(
-      median_bias = stats::median(coverage_bias, na.rm = TRUE),
+      median_coverage = stats::median(coverage_score, na.rm = TRUE),
       .by = c(filter_label, filter_size, day)
     ) |>
     dplyr::mutate(
@@ -185,9 +191,9 @@ plot_activity_combo_bias <- function(activity_combo_bias_combined, highlight_fil
         filter_label,
         levels = unique(filter_label[order(filter_size, filter_label)])
       ),
-      bias_label = sprintf("%.2f", median_bias),
+      coverage_label = sprintf("%.2f", median_coverage),
       is_highlight = !is.null(highlight_filter) & filter_label == highlight_filter,
-      text_color = ifelse(median_bias < -1, "white", "black"),
+      text_color = ifelse(median_coverage > 1, "white", "black"),
       text_face = ifelse(is_highlight, "bold", "plain")
     )
 
@@ -207,7 +213,7 @@ plot_activity_combo_bias <- function(activity_combo_bias_combined, highlight_fil
       ggplot2::aes(
         x = day,
         y = filter_label,
-        fill = median_bias
+        fill = median_coverage
       )
     ) +
     ggplot2::geom_tile(color = "white", linewidth = 1.2) +
@@ -218,7 +224,7 @@ plot_activity_combo_bias <- function(activity_combo_bias_combined, highlight_fil
       linewidth = 2.2
     ) +
     ggplot2::geom_text(
-      ggplot2::aes(label = bias_label, color = text_color, fontface = text_face),
+      ggplot2::aes(label = coverage_label, color = text_color, fontface = text_face),
       size = 4.3
     ) +
     ggplot2::scale_color_identity() +
@@ -228,14 +234,14 @@ plot_activity_combo_bias <- function(activity_combo_bias_combined, highlight_fil
       low = "#5E3C99",
       mid = "gray88",
       high = "#E66101",
-      midpoint = 0,
-      limits = c(-2, 1),
+      midpoint = 1,
+      limits = c(0, 2),
       oob = scales::squish,
       na.value = "gray90",
-      name = "Median bias\n< 0 overrepresented\n> 0 underrepresented"
+      name = "Median Coverage\n< 1 underrepresented\n> 1 overrepresented"
     ) +
     ggplot2::labs(
-      title = "Bias by Purpose-Filter Combination",
+      title = "Coverage by Purpose-Filter Combination",
       subtitle = "All destination-purpose subsets; activity at origin = Home",
       x = "Day of week",
       y = "Destination filters",
@@ -252,5 +258,49 @@ plot_activity_combo_bias <- function(activity_combo_bias_combined, highlight_fil
       plot.title.position = "plot",
       legend.title = ggplot2::element_text(size = 15),
       legend.text = ggplot2::element_text(size = 14)
+    )
+}
+
+#' Plot Daily Generation Residuals (Standardized User Count)
+plot_daily_generation_residuals <- function(generation_residuals_combined) {
+  days_order <- rev(c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+  generation_residuals_combined$day <- factor(generation_residuals_combined$day, levels = days_order)
+
+  generation_residuals_combined <- generation_residuals_combined |>
+    dplyr::mutate(day_type = ifelse(day %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
+
+  # Remove NAs
+  plot_data <- generation_residuals_combined |>
+    dplyr::filter(!is.na(standardized_user_count_residual))
+
+  # Limit y-axis limits to 99th percentile to avoid massive outliers ruining the plot
+  y_limit <- stats::quantile(abs(plot_data$standardized_user_count_residual), 0.99, na.rm = TRUE)
+  
+  ggplot(plot_data, aes(x = day, y = standardized_user_count_residual, fill = day_type)) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray60", linewidth = 0.5) +
+    # Full violin for simplicity
+    geom_violin(alpha = 0.7, trim = FALSE, color = "black", linewidth = 0.4) +
+    # Embedded boxplot
+    geom_boxplot(width = 0.15, color = "black", fill = "white", alpha = 0.6, outlier.size = 2.5, outlier.alpha = 0.7) +
+    coord_flip(ylim = c(-y_limit, y_limit)) +
+    theme_minimal(base_size = 24) +
+    scale_x_discrete(labels = rev(c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))) +
+    scale_fill_manual(values = c("Weekday" = "#1F78B4", "Weekend" = "#E31A1C")) +
+    labs(
+      title = "Generation Residuals",
+      subtitle = "Standardized User Count Residual (0 = Expected Generation)",
+      y = "Standardized Residual",
+      x = "Day of\nWeek",
+      caption = "Data Source: MITMS flows vs. ECEPOV (Origin Totals)"
+    ) +
+    theme(
+      legend.position = "none",
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_line(linewidth = 0.3, color = "gray92"),
+      plot.title = element_text(face = "bold", size = 32, vjust = 1, lineheight = 1.1),
+      plot.subtitle = element_text(size = 22, color = "gray40", lineheight = 1.1),
+      axis.title.y = element_text(angle = 0, vjust = 0.5, hjust = 0.5, size = 22, face = "bold", margin = margin(r = 15)),
+      axis.title.x = element_text(size = 22, face = "bold"),
+      axis.text = element_text(color = "black")
     )
 }

@@ -1,6 +1,9 @@
 library(targets)
 library(tarchetypes)
 
+# Increase download timeout for large files (e.g., 200MB census microdata)
+options(timeout = 600)
+
 # targets::tar_visnetwork()
 # targets::tar_make()
 
@@ -75,7 +78,8 @@ daily_analysis <- tar_map(
     )
   ),
 
-  tar_target(daily_bias_total, measure_bias_metrics(daily_merged_dataset)),
+  tar_target(daily_coverage_total, measure_coverage_metrics(daily_merged_dataset)),
+  tar_target(daily_generation_residuals, measure_generation_residuals(daily_merged_dataset)),
 
   # --- 1B. FLOW ACCURACY BRANCH (DAILY - WORK OR STUDY) ---
   tar_target(daily_mpd_raw_work, fetch_mpd(daily_dates, hourly = FALSE, purposes = "work_or_study")),
@@ -87,7 +91,7 @@ daily_analysis <- tar_map(
       target_benchmark_clean
     )
   ),
-  tar_target(daily_bias_total_work, measure_bias_metrics(daily_merged_dataset_work)),
+  tar_target(daily_coverage_total_work, measure_coverage_metrics(daily_merged_dataset_work)),
 
   # --- 1C. FLOW ACCURACY BRANCH (DAILY - ALL) ---
   tar_target(
@@ -107,10 +111,10 @@ daily_analysis <- tar_map(
       target_benchmark_clean
     )
   ),
-  tar_target(daily_bias_total_all, measure_bias_metrics(daily_merged_dataset_all)),
+  tar_target(daily_coverage_total_all, measure_coverage_metrics(daily_merged_dataset_all)),
   tar_target(
-    daily_activity_combo_bias,
-    measure_activity_combo_bias(daily_mpd_raw_all, target_benchmark_clean)
+    daily_activity_combo_coverage,
+    measure_activity_combo_coverage(daily_mpd_raw_all, target_benchmark_clean)
   ),
 
 
@@ -120,7 +124,7 @@ daily_analysis <- tar_map(
     merge_hourly_accuracy(daily_mpd_clean, target_benchmark_clean)
   ),
 
-  tar_target(daily_bias_metrics, measure_bias_metrics(daily_merged_hourly)),
+  tar_target(daily_coverage_metrics, measure_coverage_metrics(daily_merged_hourly)),
 
   # --- 3. POPULATION COVERAGE BRANCH ---
   tar_target(daily_mitms_pop_raw, fetch_mitms_population(daily_dates)),
@@ -147,43 +151,50 @@ list(
   # --- Synthesis & Visualization ---
   # Combine Flow Results
   tar_combine(
-    target_hourly_bias_combined,
-    daily_analysis$daily_bias_metrics,
+    target_hourly_coverage_score_combined,
+    daily_analysis$daily_coverage_metrics,
     command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
-      dplyr::mutate(day = gsub("daily_bias_metrics_", "", day_source))
+      dplyr::mutate(day = gsub("daily_coverage_metrics_", "", day_source))
   ),
 
   tar_combine(
-    target_daily_bias_combined,
-    daily_analysis$daily_bias_total,
+    target_daily_coverage_score_combined,
+    daily_analysis$daily_coverage_total,
     command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
-      dplyr::mutate(day = gsub("daily_bias_total_", "", day_source))
+      dplyr::mutate(day = gsub("daily_coverage_total_", "", day_source))
   ),
 
   tar_combine(
-    target_daily_bias_combined_work,
-    daily_analysis$daily_bias_total_work,
+    target_generation_residuals_combined,
+    daily_analysis$daily_generation_residuals,
     command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
-      dplyr::mutate(day = gsub("daily_bias_total_work_", "", day_source))
+      dplyr::mutate(day = gsub("daily_generation_residuals_", "", day_source))
   ),
 
   tar_combine(
-    target_daily_bias_combined_all,
-    daily_analysis$daily_bias_total_all,
+    target_daily_coverage_score_combined_work,
+    daily_analysis$daily_coverage_total_work,
     command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
-      dplyr::mutate(day = gsub("daily_bias_total_all_", "", day_source))
+      dplyr::mutate(day = gsub("daily_coverage_total_work_", "", day_source))
   ),
 
   tar_combine(
-    target_activity_combo_bias_combined,
-    daily_analysis$daily_activity_combo_bias,
+    target_daily_coverage_score_combined_all,
+    daily_analysis$daily_coverage_total_all,
     command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
-      dplyr::mutate(day = gsub("daily_activity_combo_bias_", "", day_source))
+      dplyr::mutate(day = gsub("daily_coverage_total_all_", "", day_source))
+  ),
+
+  tar_combine(
+    target_activity_combo_coverage_combined,
+    daily_analysis$daily_activity_combo_coverage,
+    command = dplyr::bind_rows(!!!.x, .id = "day_source") |>
+      dplyr::mutate(day = gsub("daily_activity_combo_coverage_", "", day_source))
   ),
 
   tar_target(
-    target_activity_combo_bias_summary,
-    summarize_activity_combo_bias(target_activity_combo_bias_combined)
+    target_activity_combo_coverage_summary,
+    summarize_activity_combo_coverage(target_activity_combo_coverage_combined)
   ),
 
   # Combine Population Coverage Results
@@ -196,49 +207,54 @@ list(
 
   # Generate final plots
   # tar_target(
-  #   target_hourly_bias_plot,
-  #   plot_hourly_bias(target_hourly_bias_combined) +
+  #   target_hourly_coverage_score_plot,
+  #   plot_hourly_coverage_score(target_hourly_coverage_score_combined) +
   #     ggplot2::labs(subtitle = "Hourly capture intensity vs. census average\nFilters: Work/Study & Infrequent Activity")
   # ),
 
   tar_target(
-    target_daily_bias_plot,
-    plot_daily_bias(target_daily_bias_combined) +
+    target_daily_coverage_score_plot,
+    plot_daily_coverage_score(target_daily_coverage_score_combined) +
       ggplot2::labs(subtitle = expression(atop("Relative discrepancy between MITMS trips and census benchmarks", paste("Filters: ", bold("Work/Study & Infrequent Activity")))))
   ),
 
   tar_target(
-    target_daily_bias_plot_work,
-    plot_daily_bias(target_daily_bias_combined_work) +
+    target_generation_residuals_plot,
+    plot_daily_generation_residuals(target_generation_residuals_combined)
+  ),
+
+  tar_target(
+    target_daily_coverage_score_plot_work,
+    plot_daily_coverage_score(target_daily_coverage_score_combined_work) +
       ggplot2::labs(subtitle = expression(atop("Relative discrepancy between MITMS trips and census benchmarks", paste("Filters: ", bold("Work or Study Only")))))
   ),
 
   tar_target(
-    target_daily_bias_plot_all,
-    plot_daily_bias(target_daily_bias_combined_all) +
+    target_daily_coverage_score_plot_all,
+    plot_daily_coverage_score(target_daily_coverage_score_combined_all, max_x = 10) +
       ggplot2::labs(subtitle = expression(atop("Relative discrepancy between MITMS trips and census benchmarks", paste("Filters: ", bold("None")))))
   ),
 
   tar_target(
-    target_activity_combo_bias_plot,
-    plot_activity_combo_bias(
-      target_activity_combo_bias_combined,
+    target_activity_combo_coverage_plot,
+    plot_activity_combo_coverage(
+      target_activity_combo_coverage_combined,
       highlight_filter = "Work or Study + Infrequent Activity"
     )
   ),
 
   tar_target(
-    target_activity_combo_bias_work_plot,
-    plot_activity_combo_bias(
-      target_activity_combo_bias_combined,
+    target_activity_combo_coverage_work_plot,
+    plot_activity_combo_coverage(
+      target_activity_combo_coverage_combined,
       highlight_filter = "Work or Study"
     )
   ),
 
   tar_target(
-    target_activity_combo_bias_work_frequent_plot,
-    plot_activity_combo_bias(
-      target_activity_combo_bias_combined,
+    target_activity_combo_coverage_work_frequent_plot,
+    plot_activity_combo_coverage(
+      target_activity_combo_coverage_combined,
       highlight_filter = "Work or Study + Frequent Activity"
     )
   ),
@@ -250,17 +266,17 @@ list(
 
   tar_target(
     target_pop_vs_coverage_plot,
-    plot_pop_vs_coverage_bias(target_pop_coverage_combined)
+    plot_pop_vs_coverage_score(target_pop_coverage_combined)
   ),
 
   # Save PNG files (Standardized to width=12, height=8)
   # tar_target(
-  #   target_hourly_bias_png,
+  #   target_hourly_coverage_score_png,
   #   {
-  #     path <- "figures/hourly_bias_march_2023.png"
+  #     path <- "figures/hourly_coverage_score_march_2023.png"
   #     ggplot2::ggsave(
   #       path,
-  #       target_hourly_bias_plot,
+  #       target_hourly_coverage_score_plot,
   #       width = 12,
   #       height = 8,
   #       dpi = 300
@@ -271,12 +287,12 @@ list(
   # ),
 
   tar_target(
-    target_daily_bias_png,
+    target_daily_coverage_score_png,
     {
-      path <- "figures/daily_bias_march_2023.png"
+      path <- "figures/daily_coverage_score_march_2023.png"
       ggplot2::ggsave(
         path,
-        target_daily_bias_plot,
+        target_daily_coverage_score_plot,
         width = 12,
         height = 8,
         dpi = 300
@@ -287,12 +303,12 @@ list(
   ),
 
   tar_target(
-    target_daily_bias_work_png,
+    target_generation_residuals_png,
     {
-      path <- "figures/daily_bias_work_march_2023.png"
+      path <- "figures/daily_generation_residuals_march_2023.png"
       ggplot2::ggsave(
         path,
-        target_daily_bias_plot_work,
+        target_generation_residuals_plot,
         width = 12,
         height = 8,
         dpi = 300
@@ -303,12 +319,12 @@ list(
   ),
 
   tar_target(
-    target_daily_bias_all_png,
+    target_daily_coverage_score_work_png,
     {
-      path <- "figures/daily_bias_all_march_2023.png"
+      path <- "figures/daily_coverage_score_work_march_2023.png"
       ggplot2::ggsave(
         path,
-        target_daily_bias_plot_all,
+        target_daily_coverage_score_plot_work,
         width = 12,
         height = 8,
         dpi = 300
@@ -319,22 +335,12 @@ list(
   ),
 
   tar_target(
-    target_activity_combo_bias_csv,
+    target_daily_coverage_score_all_png,
     {
-      path <- "figures/activity_combo_bias_march_2023.csv"
-      utils::write.csv(target_activity_combo_bias_summary, path, row.names = FALSE)
-      path
-    },
-    format = "file"
-  ),
-
-  tar_target(
-    target_activity_combo_bias_png,
-    {
-      path <- "figures/activity_combo_bias_march_2023.png"
+      path <- "figures/daily_coverage_score_all_march_2023.png"
       ggplot2::ggsave(
         path,
-        target_activity_combo_bias_plot,
+        target_daily_coverage_score_plot_all,
         width = 12,
         height = 8,
         dpi = 300
@@ -345,12 +351,22 @@ list(
   ),
 
   tar_target(
-    target_activity_combo_bias_best_png,
+    target_activity_combo_coverage_csv,
     {
-      path <- "figures/activity_combo_bias_best_march_2023.png"
+      path <- "figures/activity_combo_coverage_march_2023.csv"
+      utils::write.csv(target_activity_combo_coverage_summary, path, row.names = FALSE)
+      path
+    },
+    format = "file"
+  ),
+
+  tar_target(
+    target_activity_combo_coverage_png,
+    {
+      path <- "figures/activity_combo_coverage_march_2023.png"
       ggplot2::ggsave(
         path,
-        target_activity_combo_bias_plot,
+        target_activity_combo_coverage_plot,
         width = 12,
         height = 8,
         dpi = 300
@@ -361,12 +377,12 @@ list(
   ),
 
   tar_target(
-    target_activity_combo_bias_work_png,
+    target_activity_combo_coverage_best_png,
     {
-      path <- "figures/activity_combo_bias_work_march_2023.png"
+      path <- "figures/activity_combo_coverage_best_march_2023.png"
       ggplot2::ggsave(
         path,
-        target_activity_combo_bias_work_plot,
+        target_activity_combo_coverage_plot,
         width = 12,
         height = 8,
         dpi = 300
@@ -377,12 +393,28 @@ list(
   ),
 
   tar_target(
-    target_activity_combo_bias_work_frequent_png,
+    target_activity_combo_coverage_work_png,
     {
-      path <- "figures/activity_combo_bias_work_frequent_march_2023.png"
+      path <- "figures/activity_combo_coverage_work_march_2023.png"
       ggplot2::ggsave(
         path,
-        target_activity_combo_bias_work_frequent_plot,
+        target_activity_combo_coverage_work_plot,
+        width = 12,
+        height = 8,
+        dpi = 300
+      )
+      path
+    },
+    format = "file"
+  ),
+
+  tar_target(
+    target_activity_combo_coverage_work_frequent_png,
+    {
+      path <- "figures/activity_combo_coverage_work_frequent_march_2023.png"
+      ggplot2::ggsave(
+        path,
+        target_activity_combo_coverage_work_frequent_plot,
         width = 12,
         height = 8,
         dpi = 300
@@ -411,7 +443,7 @@ list(
   tar_target(
     target_pop_vs_coverage_png,
     {
-      path <- "figures/pop_vs_coverage_bias_march_2023.png"
+      path <- "figures/pop_vs_coverage_score_march_2023.png"
       ggplot2::ggsave(
         path,
         target_pop_vs_coverage_plot,

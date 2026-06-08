@@ -50,3 +50,27 @@ clean_benchmarks <- function(benchmark_raw, zones_raw) {
 
   matched_bench
 }
+
+#' Process the Microdata ZIP into an OD matrix
+clean_microdata_od_matrix <- function(zip_path) {
+  tmp <- tempdir()
+  
+  # Unzip the main file
+  utils::unzip(zip_path, files = "ECEPOVadultos.zip", exdir = tmp)
+  
+  # Unzip the adult file
+  adult_zip <- file.path(tmp, "ECEPOVadultos.zip")
+  utils::unzip(adult_zip, files = "Microdatos_ECEPOV_Adultos.csv", exdir = tmp)
+  
+  csv_path <- file.path(tmp, "Microdatos_ECEPOV_Adultos.csv")
+  
+  # Read the CSV using data.table for speed
+  dt <- data.table::fread(csv_path)
+  
+  # Clean up temp files
+  unlink(adult_zip)
+  unlink(csv_path)
+  
+  # For now, just return the first few rows so we can inspect the exact column names
+  head(dt)
+}

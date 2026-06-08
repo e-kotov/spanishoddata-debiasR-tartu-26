@@ -54,7 +54,7 @@ merge_hourly_accuracy <- function(mpd_clean, benchmark_clean) {
 }
 
 #' Measure bias metrics using debiasR
-measure_bias_metrics <- function(merged_dataset_or_df) {
+measure_coverage_metrics <- function(merged_dataset_or_df) {
   # Accept either a list (from merge_datasets) or a raw data frame
   coverage_df <- if (is.data.frame(merged_dataset_or_df)) merged_dataset_or_df else merged_dataset_or_df$coverage
 
@@ -77,7 +77,7 @@ measure_bias_metrics <- function(merged_dataset_or_df) {
 }
 
 #' Measure coverage bias for every destination-purpose filter combination
-measure_activity_combo_bias <- function(mpd_raw, benchmark_clean) {
+measure_activity_combo_coverage <- function(mpd_raw, benchmark_clean) {
   purposes <- c("work_or_study", "infrequent_activity", "frequent_activity")
   purpose_sets <- unlist(
     lapply(
@@ -120,13 +120,12 @@ measure_activity_combo_bias <- function(mpd_raw, benchmark_clean) {
   }))
 }
 
-#' Summarize destination-purpose filter bias across municipalities and days
-summarize_activity_combo_bias <- function(activity_combo_bias_combined) {
-  activity_combo_bias_combined |>
+#' Summarize destination-purpose filter coverage across municipalities and days
+summarize_activity_combo_coverage <- function(activity_combo_coverage_combined) {
+  activity_combo_coverage_combined |>
     dplyr::summarise(
-      median_bias = stats::median(coverage_bias, na.rm = TRUE),
-      mean_bias = mean(coverage_bias, na.rm = TRUE),
-      median_coverage_ratio = stats::median(coverage_score, na.rm = TRUE),
+      median_coverage = stats::median(coverage_score, na.rm = TRUE),
+      mean_coverage = mean(coverage_score, na.rm = TRUE),
       municipalities = dplyr::n_distinct(origin),
       days = dplyr::n_distinct(day),
       observations = dplyr::n(),
@@ -134,15 +133,15 @@ summarize_activity_combo_bias <- function(activity_combo_bias_combined) {
     ) |>
     dplyr::mutate(
       representation = dplyr::case_when(
-        median_bias < 0 ~ "Overrepresented",
-        median_bias > 0 ~ "Underrepresented",
+        median_coverage > 1 ~ "Overrepresented",
+        median_coverage < 1 ~ "Underrepresented",
         TRUE ~ "Matches benchmark"
       )
     ) |>
     dplyr::arrange(filter_size, filter_label)
 }
 
-#' Merge and Calculate Population Coverage Bias (Vignette #4 Style)
+#' Merge and Calculate Population Coverage (Vignette #4 Style)
 merge_population_coverage <- function(mitms_pop_raw, census_population) {
   coverage_df <- census_population |>
     dplyr::inner_join(mitms_pop_raw, by = "origin") |>
@@ -150,4 +149,22 @@ merge_population_coverage <- function(mitms_pop_raw, census_population) {
     dplyr::mutate(mpd_source = "MITMS")
 
   debiasR::measure_bias(coverage_df)
+}
+
+#' Measure Area-Level Generation Residuals
+measure_generation_residuals <- function(merged_dataset_or_df) {
+  # Accept either a list (from merge_datasets) or a raw data frame
+  coverage_df <- if (is.data.frame(merged_dataset_or_df)) merged_dataset_or_df else merged_dataset_or_df$coverage
+
+  # Use debiasR to calculate standardized residuals based on population and user_count
+  # Here, population corresponds to expected total commuting generations from the benchmark
+  res <- debiasR::validate_bias_residual_structure(
+    coverage_df = coverage_df,
+    coverage_area_col = "origin",
+    population_col = "population",
+    user_count_col = "user_count"
+  )
+  
+  # Extract the area-level residual table
+  res$area_level
 }

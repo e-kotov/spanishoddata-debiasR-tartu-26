@@ -45,7 +45,7 @@ format:
 
   <div style="padding: 5px; margin: 0 5px;">
     <img src="media/debiasR-logo.png" style="height: 110px; width: auto; display: block; margin: 0 auto 10px;">
-    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Bias Measurement</div>
+    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Coverage Measurement</div>
     <div style="font-size: 0.65em; font-family: monospace; color: #566573;">{debiasR}</div>
   </div>
 </div>
@@ -58,54 +58,58 @@ format:
 
 ## Results
 
-<!-- ## Hourly Bias (March 2023)
+<!-- ## Hourly Coverage Score (March 2023)
 
-![](../figures/hourly_bias_march_2023.png){fig-align="center"} -->
+![](../figures/hourly_coverage_score_march_2023.png){fig-align="center"} -->
 
 ## Population Coverage (March 2023)
 
 ![](../figures/population_coverage_march_2023.png){fig-align="center"}
 
 
-## Population Coverage Bias (March 2023)
+## Population Coverage Score (March 2023)
 
-![](../figures/pop_vs_coverage_bias_march_2023.png){fig-align="center"}
+![](../figures/pop_vs_coverage_score_march_2023.png){fig-align="center"}
 
 
-## Daily Coverage Bias
+## Daily Coverage Score
 
 ### (No Filters)
 
-![](../figures/daily_bias_all_march_2023.png){fig-align="center"}
+![](../figures/daily_coverage_score_all_march_2023.png){fig-align="center"}
 
 
-## Daily Coverage Bias
+## Daily Coverage Score
 
 ### (home -> work/study)
 
-![](../figures/daily_bias_work_march_2023.png){fig-align="center"}
+![](../figures/daily_coverage_score_work_march_2023.png){fig-align="center"}
 
 
-## Daily Coverage Bias
+## Daily Coverage Score
 
 ### (home -> work/study + infreq)
 
-![](../figures/daily_bias_march_2023.png){fig-align="center"}
+![](../figures/daily_coverage_score_march_2023.png){fig-align="center"}
 
-## Bias Across Activity Filters
+## Coverage Score Across Activity Filters
 
 ### Work/study only
 
-![](../figures/activity_combo_bias_work_march_2023.png){fig-align="center"}
+![](../figures/activity_combo_coverage_work_march_2023.png){fig-align="center"}
 
-## Bias Across Activity Filters
+## Coverage Score Across Activity Filters
 
 ### Work/study + frequent
 
-![](../figures/activity_combo_bias_work_frequent_march_2023.png){fig-align="center"}
+![](../figures/activity_combo_coverage_work_frequent_march_2023.png){fig-align="center"}
 
-## Bias Across Activity Filters
+## Coverage Score Across Activity Filters
 
 ### Best match: work/study + infrequent
 
-![](../figures/activity_combo_bias_best_march_2023.png){fig-align="center"}
+![](../figures/activity_combo_coverage_best_march_2023.png){fig-align="center"}
+
+## Generation Residuals (March 2023)
+
+![](../figures/daily_generation_residuals_march_2023.png){fig-align="center"}
