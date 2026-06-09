@@ -39,13 +39,13 @@ format:
 
   <div style="padding: 5px; margin: 0 5px;">
     <img src="media/ineAtlas-logo.png" style="height: 110px; width: auto; display: block; margin: 0 auto 10px;">
-    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Population Benchmark</div>
+    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Population Benchmark and Covariates</div>
     <div style="font-size: 0.65em; font-family: monospace; color: #566573;">{ineAtlas}</div>
   </div>
 
   <div style="padding: 5px; margin: 0 5px;">
     <img src="media/debiasR-logo.png" style="height: 110px; width: auto; display: block; margin: 0 auto 10px;">
-    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Coverage Measurement</div>
+    <div style="font-weight: bold; margin-bottom: 2px; font-size: 0.85em;">Bias measurement & adjustment</div>
     <div style="font-size: 0.65em; font-family: monospace; color: #566573;">{debiasR}</div>
   </div>
 </div>
@@ -56,72 +56,117 @@ format:
 
 ## [5 years of hourly OD matrices]{.glass-box} {background-color="black" background-image="media/barcelona-time.gif" background-size="contain"}
 
-## Results
+## Census data
 
-<!-- ## Hourly Coverage Score (March 2023)
+### Origin based commuting data only, 1% sample
 
-![](../figures/hourly_coverage_score_march_2023.png){fig-align="center"} -->
 
-## Population Coverage (March 2023)
+<br>
+
+::: {style="font-size: 0.75em;"}
+| Origin Municipality | Official INE Code | Destination | Total Commuters (Outflow) |
+| :--- | :--- | :---: | :---: |
+| **Motril** | `18140` | <span style="color: #888;">*Unknown*</span> | 26,180 |
+| **Torrelavega** | `39088` | <span style="color: #888;">*Unknown*</span> | 22,380 |
+| **Aranjuez** | `28013` | <span style="color: #888;">*Unknown*</span> | 27,307 |
+| **Santa Lucía de Tirajana** | `35022` | <span style="color: #888;">*Unknown*</span> | 35,019 |
+:::
+
+
+
+
+# Results
+
+## Population Coverage Bias
 
 ![](../figures/population_coverage_march_2023.png){fig-align="center"}
 
 
-## Population Coverage Score (March 2023)
+## Coverage Bias by Area Population
 
 ![](../figures/pop_vs_coverage_score_march_2023.png){fig-align="center"}
 
+<!-- 
+## Coverage Bias Outliers — Weekdays
 
-## Daily Coverage Score
+### Areas with |median $b_i$| > 0.3
 
-### (No Filters)
+![](../figures/outlier_map_weekday.png){fig-align="center"}
+
+
+## Coverage Bias Outliers — Weekends
+
+### Areas with |median $b_i$| > 0.3
+
+![](../figures/outlier_map_weekend.png){fig-align="center"} -->
+
+
+## Daily Flow Coverage Ratio
+
+### 🏠 home → 💼🎓 work/study + 🛒 frequent + 🎭 infrequent
 
 ![](../figures/daily_coverage_score_all_march_2023.png){fig-align="center"}
 
 
-## Daily Coverage Score
+## Daily Flow Coverage Ratio
 
-### (home -> work/study)
+### 🏠 home → 💼🎓 work/study
 
 ![](../figures/daily_coverage_score_work_march_2023.png){fig-align="center"}
 
 
-## Daily Coverage Score
+## Daily Flow Coverage Ratio
 
-### (home -> work/study + infreq)
+### 🏠 home → 💼🎓 work/study + 🎭 infrequent
 
 ![](../figures/daily_coverage_score_march_2023.png){fig-align="center"}
 
-## Coverage Score Across Activity Filters
+## Flow Coverage Ratio by Activity Filters
 
-### Work/study only
+### 💼🎓 work/study only
 
 ![](../figures/activity_combo_coverage_work_march_2023.png){fig-align="center"}
 
-## Coverage Score Across Activity Filters
+## Flow Coverage Ratio by Activity Filters
 
-### Work/study + frequent
+### 💼🎓 work/study + 🛒 frequent
 
 ![](../figures/activity_combo_coverage_work_frequent_march_2023.png){fig-align="center"}
 
-## Coverage Score Across Activity Filters
+## Flow Coverage Ratio by Activity Filters
 
-### Best match: work/study + infrequent
+### Best match: 💼🎓 work/study + 🎭 infrequent
 
 ![](../figures/activity_combo_coverage_best_march_2023.png){fig-align="center"}
 
-## Generation Residuals (March 2023)
+## Standardized User-Count Residuals
 
-![](../figures/daily_generation_residuals_march_2023.png){fig-align="center"}
+### debiasR Level-2 marginal validation
+
+![](../figures/daily_user_count_residuals_march_2023.png){fig-align="center"}
 
 ## Bias Adjustment Performance
 
+### Origin-marginal fit only
+
 ![](../figures/adjustment_method_comparison_march_2023.png){fig-align="center"}
 
-<!-- ### Key Findings
-- **Selection Rate (Income)** provided the best correction, reducing Mean Absolute Error (MAE) by ~6%.
-- **Multilevel Model** requires more granular destination-side covariates to improve upon the base capture rates. -->
+<!-- ## Origin Marginal Validation
 
-## Origin Marginal Validation
+![](../figures/margin_diagnostic_scatter.png){fig-align="center"} -->
+<!-- 
+## Origin-Marginal Residual Heatmap (Level 3 Validation)
 
-![](../figures/margin_diagnostic_scatter.png){fig-align="center"}
+![](../figures/level3_residual_heatmap_march_2023.png){fig-align="center" height="500px"} -->
+
+## Origin-Marginal Residuals
+
+![](../figures/level3_residual_stacked_bar_march_2023.png){fig-align="center" height="500px"}
+
+## Origin-Marginal Residuals
+
+![](../figures/level3_residual_stacked_bar_hl1_march_2023.png){fig-align="center" height="500px"}
+
+## Origin-Marginal Residuals
+
+![](../figures/level3_residual_stacked_bar_hl2_march_2023.png){fig-align="center" height="500px"}

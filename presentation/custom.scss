@@ -16,6 +16,16 @@ $presentation-body-font: "Source Sans Pro", Helvetica, sans-serif;
   text-transform: none;
 }
 
+/* Slide subtitles (h3 directly under slide h2) — single-line fit */
+.reveal .slides section > h3 {
+  font-size: 0.7em;
+  font-weight: 500;
+  color: #566573;
+  margin-top: -0.3em;
+  margin-bottom: 0.4em;
+  white-space: nowrap;
+}
+
 .reveal .slides section {
   text-align: left;
 }

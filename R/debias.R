@@ -1,15 +1,20 @@
-#' Merge datasets for bias analysis
+#' Merge MPD flows with origin-marginal benchmark for coverage-bias measurement
+#'
+#' The benchmark is ECEPOV "Total Commuters by Origin" — a flow marginal, not a
+#' population count. `measure_bias()` requires the column to be named
+#' `population`, so we satisfy that contract while keeping the math honest:
+#' the resulting `coverage_score = U_i / P_i` is a **flow coverage ratio**
+#' (MPD outflows / Census commuter outflow benchmark), not the canonical
+#' population coverage score (which is computed separately in
+#' `merge_population_coverage()`).
 merge_datasets <- function(mpd_clean, benchmark_clean) {
-  # Commuter benchmark target (for TRUE accuracy measurement)
   bench_df <- benchmark_clean |>
     dplyr::select(origin, target)
 
-  # Total user trips per zone (Daily only)
   user_df <- mpd_clean |>
     dplyr::group_by(origin) |>
     dplyr::summarise(user_count = sum(flow, na.rm = TRUE), .groups = "drop")
 
-  # Create the coverage data frame
   coverage_df <- bench_df |>
     dplyr::inner_join(user_df, by = "origin") |>
     dplyr::mutate(
@@ -25,55 +30,13 @@ merge_datasets <- function(mpd_clean, benchmark_clean) {
   )
 }
 
-#' Dedicated merge for HOURLY accuracy
-merge_hourly_accuracy <- function(mpd_clean, benchmark_clean) {
-  bench_df <- benchmark_clean |> dplyr::select(origin, target)
-
-  # Robust Hourly Join: Ensure all 24 hours exist
-  all_hours <- expand.grid(
-    origin = unique(bench_df$origin),
-    hour = 0:23,
-    stringsAsFactors = FALSE
-  )
-
-  user_df <- mpd_clean |>
-    dplyr::group_by(origin, hour) |>
-    dplyr::summarise(user_count = sum(flow, na.rm = TRUE), .groups = "drop")
-
-  coverage_df <- all_hours |>
-    dplyr::left_join(user_df, by = c("origin", "hour")) |>
-    dplyr::inner_join(bench_df, by = "origin") |>
-    dplyr::mutate(
-      user_count = dplyr::coalesce(user_count, 0),
-      mpd_source = "MITMS",
-      population = target / 24 # THE CRITICAL SCALING
-    ) |>
-    dplyr::select(-target)
-
-  coverage_df
-}
-
-#' Measure bias metrics using debiasR
-measure_coverage_metrics <- function(merged_dataset_or_df) {
-  # Accept either a list (from merge_datasets) or a raw data frame
+#' Measure coverage bias via debiasR
+#'
+#' Wraps `debiasR::measure_bias()`. Returns canonical columns
+#' `coverage_score = U_i/P_i` and `coverage_bias = 1 - U_i/P_i`.
+measure_coverage_bias <- function(merged_dataset_or_df) {
   coverage_df <- if (is.data.frame(merged_dataset_or_df)) merged_dataset_or_df else merged_dataset_or_df$coverage
-
-  # Helper to calculate relative error (Directional)
-  calc_relative_error <- function(df) {
-    res <- debiasR::measure_bias(df)
-    return(res)
-  }
-
-  # If hourly, measure bias for each hour
-  if ("hour" %in% colnames(coverage_df)) {
-    bias_results <- coverage_df |>
-      dplyr::group_by(hour) |>
-      dplyr::group_modify(~ calc_relative_error(.x)) |>
-      dplyr::ungroup()
-    return(bias_results)
-  } else {
-    return(calc_relative_error(coverage_df))
-  }
+  debiasR::measure_bias(coverage_df)
 }
 
 #' Measure coverage bias for every destination-purpose filter combination
@@ -141,7 +104,7 @@ summarize_activity_combo_coverage <- function(activity_combo_coverage_combined) 
     dplyr::arrange(filter_size, filter_label)
 }
 
-#' Merge and Calculate Population Coverage (Vignette #4 Style)
+#' Merge and compute population coverage (debiasR Vignette v04)
 merge_population_coverage <- function(mitms_pop_raw, census_population) {
   coverage_df <- census_population |>
     dplyr::inner_join(mitms_pop_raw, by = "origin") |>
@@ -151,34 +114,101 @@ merge_population_coverage <- function(mitms_pop_raw, census_population) {
   debiasR::measure_bias(coverage_df)
 }
 
-#' Measure Area-Level Generation Residuals
-measure_generation_residuals <- function(merged_dataset_or_df) {
-  # Accept either a list (from merge_datasets) or a raw data frame
+#' Standardized user-count residuals (origin-marginal, debiasR canonical name)
+measure_user_count_residuals <- function(merged_dataset_or_df) {
   coverage_df <- if (is.data.frame(merged_dataset_or_df)) merged_dataset_or_df else merged_dataset_or_df$coverage
-
-  # Use debiasR to calculate standardized residuals based on population and user_count
-  # Here, population corresponds to expected total commuting generations from the benchmark
   res <- debiasR::validate_bias_residual_structure(
     coverage_df = coverage_df,
     coverage_area_col = "origin",
     population_col = "population",
     user_count_col = "user_count"
   )
-  
-  # Extract the area-level residual table
   res$area_level
 }
 
-#' Prep benchmark totals as a dummy OD table for debiasR
-prep_benchmark_for_adjustment <- function(benchmark_clean) {
-  # debiasR adjustment functions expect an OD matrix even for marginal calibration.
-  # Since we only have origin totals, we create a dummy self-loop OD matrix
-  # where destination = origin, which allows the package functions to function
-  # correctly using 'origin' calibration.
+#' Build an origin pseudo-OD benchmark (destination = origin) for adjustment APIs
+#'
+#' The `adjust_selection_rate()` API requires a `benchmark_od_df` with origin AND
+#' destination columns. With marginal-origin data only, we encode the benchmark
+#' as a degenerate diagonal table; with `calibration_aggregate = "origin"` the
+#' function collapses to origin margins and the destination column is unused.
+#' This is **not** a real OD benchmark — never validate OD-cell predictions
+#' against it. See `validate_origin_margin()` for the correct validation scope.
+make_origin_pseudo_od <- function(benchmark_clean) {
   benchmark_clean |>
     dplyr::transmute(
       origin = as.character(origin),
-      destination = as.character(origin), # Dummy destination
+      destination = as.character(origin),
       flow = as.numeric(target)
     )
+}
+
+#' Raking-ratio adjustment against origin-marginal targets
+#'
+#' Canonical debiasR method for marginal-origin-only benchmarks
+#' (`adjust_raking_ratio()` accepts `origin_targets` directly; no OD benchmark
+#' required). Returns an OD-level adjusted-flow table.
+adjust_origin_flows_raking <- function(mpd_od_df, benchmark_clean) {
+  origin_targets <- benchmark_clean |>
+    dplyr::transmute(
+      origin = as.character(origin),
+      target = as.numeric(target)
+    )
+  debiasR::adjust_raking_ratio(
+    mpd_od_df = mpd_od_df,
+    origin_targets = origin_targets
+  )
+}
+
+#' Inverse-penetration adjustment using residential coverage at origins
+#'
+#' Uses true population counts at the origin (residents vs. census population)
+#' as the penetration source. Per v06 vignette: "useful first adjustment when
+#' the main known source of bias is uneven population coverage."
+adjust_origin_flows_inverse_penetration <- function(mpd_od_df, pop_coverage_df) {
+  cov_df <- pop_coverage_df |>
+    dplyr::select(origin, population, user_count) |>
+    dplyr::mutate(
+      origin = as.character(origin),
+      mpd_source = "MITMS"
+    )
+  debiasR::adjust_inverse_penetration(
+    mpd_od_df = mpd_od_df,
+    coverage_df = cov_df,
+    weight_by = "origin"
+  )
+}
+
+#' Validate adjusted flows against the origin-marginal benchmark
+#'
+#' Aggregates adjusted OD flows to origin margins, then calls
+#' `validate_flow_overall()` on origin-margin vs. origin-margin (encoded as a
+#' diagonal table so the OD-shape API accepts it). The reported Pearson/RMSE/MAE
+#' therefore reflect origin-marginal fit — the only fit scope this project's
+#' benchmark supports.
+validate_origin_margin <- function(adj_df, benchmark_clean, method_name,
+                                   flow_col_adj = "flow_adj") {
+  adj_origin <- adj_df |>
+    dplyr::group_by(origin) |>
+    dplyr::summarise(
+      flow_adj = sum(.data[[flow_col_adj]], na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(
+      origin = as.character(origin),
+      destination = origin
+    )
+
+  bench_origin <- benchmark_clean |>
+    dplyr::transmute(
+      origin = as.character(origin),
+      destination = origin,
+      flow = as.numeric(target)
+    )
+
+  debiasR::validate_flow_overall(
+    adj_df = adj_origin,
+    benchmark_od_df = bench_origin,
+    method_name = method_name
+  )
 }

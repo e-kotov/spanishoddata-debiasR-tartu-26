@@ -2,66 +2,13 @@ library(ggplot2)
 library(dplyr)
 library(ggdist)
 
-#' Plot Hourly Capture Rates across Days (Capture Score Ratio)
-plot_hourly_coverage_score <- function(hourly_coverage_combined) {
-  # Ensure day is a factor with correct order
-  days_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-  hourly_coverage_combined$day <- factor(hourly_coverage_combined$day, levels = days_order)
-
-  # Categorize days
-  hourly_coverage_combined <- hourly_coverage_combined |>
-    dplyr::mutate(day_type = ifelse(day %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
-
-  # Calculate Capture Score: (Actual Hourly Trips) / (Average Hourly Census Benchmark)
-  # 1.0 means exactly 1/24th of the daily census total was captured in this hour.
-  hourly_profile <- hourly_coverage_combined
-
-  # Temporal Profile Plot (Projector-Ready)
-  ggplot(hourly_profile, aes(x = hour, y = coverage_score, color = day_type, fill = day_type)) +
-    # 0. Reference line for Census Average (1.0)
-    geom_hline(yintercept = 1.0, linetype = "dashed", color = "gray50", linewidth = 1.0) +
-    # 1. Distribution Ribbons (50%, 80%, 95% intervals)
-    ggdist::stat_lineribbon(
-      aes(fill_levels = ordered(after_stat(.width))),
-      .width = c(.50, .80, .95),
-      alpha = 0.5,
-      linewidth = 2.0
-    ) +
-    geom_line(stat = "summary", fun = median, color = "black", linewidth = 1.2) +
-    facet_wrap(~day, ncol = 4) +
-    theme_minimal(base_size = 24) +
-    scale_y_continuous(
-      breaks = seq(0, 10, 1.0), # Fewer labels (every 1.0) to avoid vertical squishing
-      limits = c(0, NA),
-      expand = expansion(mult = c(0, 0.1))
-    ) +
-    scale_x_continuous(breaks = c(0, 6, 12, 18, 23)) + # More labels for better orientation
-    scale_fill_manual(values = c("Weekday" = "#1F78B4", "Weekend" = "#E31A1C"), name = "Day Type") +
-    scale_color_manual(values = c("Weekday" = "#1F78B4", "Weekend" = "#E31A1C"), guide = "none") +
-    ggdist::scale_fill_ramp_discrete(name = "Zones Included", labels = c("95%", "80%", "50%"), range = c(0.2, 0.7)) +
-    labs(
-      title = "Temporal Capture Accuracy",
-      subtitle = "Hourly capture intensity vs. census average\n(Dashed line = 1.0 benchmark)",
-      x = "Hour of Day (0-23)",
-      y = "Coverage Score\n(Ratio to Census)",
-      caption = "Data Source: MITMS flows via {spanishoddata} vs. ECEPOV"
-    ) +
-    theme(
-      legend.position = "top",
-      panel.grid.minor = element_blank(),
-      panel.grid.major = element_line(linewidth = 0.3, color = "gray92"),
-      strip.background = element_blank(),
-      strip.text = element_text(face = "bold", size = 20),
-      plot.title = element_text(face = "bold", size = 32),
-      plot.subtitle = element_text(size = 20, color = "gray40"),
-      axis.title.y = element_text(angle = 0, vjust = 0.5, hjust = 0.5, size = 20, face = "bold", margin = margin(r = 15)),
-      axis.title.x = element_text(size = 20, face = "bold"),
-      axis.text = element_text(color = "black")
-    )
-}
-
-#' Plot Daily Coverage Score Distribution (Simple Violin + Boxplot)
-plot_daily_coverage_score <- function(daily_coverage_combined, max_x = 2) {
+#' Plot Daily Flow Coverage Ratio Distribution (Simple Violin + Boxplot)
+#'
+#' Note: although the underlying column is `coverage_score` (debiasR API), the
+#' input here is a *flow* coverage ratio — MPD origin outflows divided by the
+#' Census commuter-outflow benchmark — not the population coverage score
+#' $p_i = U_i / P_i$ defined in v04 of the debiasR vignettes.
+plot_daily_coverage_score <- function(daily_coverage_combined, max_x = 4) {
   days_order <- rev(c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
   daily_coverage_combined$day <- factor(daily_coverage_combined$day, levels = days_order)
 
@@ -75,7 +22,7 @@ plot_daily_coverage_score <- function(daily_coverage_combined, max_x = 2) {
   }
 
   ggplot(daily_coverage_combined, aes(x = day, y = coverage_score, fill = day_type)) +
-    geom_hline(yintercept = 1, linetype = "dashed", color = "gray60", linewidth = 0.5) +
+    geom_hline(yintercept = 1, linetype = "dashed", color = "gray25", linewidth = 1.2) +
     # Full violin for simplicity
     geom_violin(alpha = 0.7, trim = FALSE, color = "black", linewidth = 0.4) +
     # Embedded boxplot
@@ -86,9 +33,9 @@ plot_daily_coverage_score <- function(daily_coverage_combined, max_x = 2) {
     scale_y_continuous(breaks = x_breaks) +
     scale_fill_manual(values = c("Weekday" = "#1F78B4", "Weekend" = "#E31A1C")) +
     labs(
-      title = "Daily Capture Accuracy",
-      subtitle = "Coverage score: MITMS trips divided by census benchmark",
-      y = "Coverage Score\n(Ratio to Census)",
+      title = "Daily Flow Coverage Ratio",
+      subtitle = expression(r[i] == F[i] / T[i]),
+      y = expression("Flow coverage ratio, " * r[i]),
       x = "Day of\nWeek",
       caption = "Data Source: MITMS flows via {spanishoddata} vs. ECEPOV"
     ) +
@@ -111,20 +58,18 @@ plot_population_coverage <- function(pop_coverage_combined) {
   pop_coverage_combined <- pop_coverage_combined |>
     dplyr::mutate(day_type = ifelse(day %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
 
-  max_abs_bias <- max(abs(pop_coverage_combined$coverage_bias), na.rm = TRUE)
-
   ggplot(pop_coverage_combined, aes(x = day, y = coverage_bias, fill = day_type)) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray60", linewidth = 0.5) +
     geom_violin(alpha = 0.7, trim = FALSE, color = "black", linewidth = 0.4) +
     geom_boxplot(width = 0.15, color = "black", fill = "white", alpha = 0.6, outlier.size = 2.5, outlier.alpha = 0.7) +
-    coord_flip(ylim = c(-max_abs_bias, max_abs_bias)) +
+    coord_flip(ylim = c(-1, 1)) +
     theme_minimal(base_size = 24) +
     scale_x_discrete(labels = rev(c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))) +
     scale_y_continuous(n.breaks = 8) +
     scale_fill_manual(values = c("Weekday" = "#1F78B4", "Weekend" = "#E31A1C")) +
     labs(
       title = "Population Coverage Bias",
-      subtitle = "Penetration gap (MITMS residents vs. census population)",
+      subtitle = NULL,
       y = expression("Coverage bias, " * b[i]),
       x = "Day of\nWeek",
       caption = "Data Source: MITMS overnight stays vs. ineAtlas"
@@ -176,7 +121,10 @@ plot_pop_vs_coverage_score <- function(pop_coverage_combined) {
     )
 }
 
-#' Plot daily median coverage score for every destination-purpose filter set
+#' Plot daily median flow coverage ratio for every destination-purpose filter set
+#'
+#' The tile values are *flow* coverage ratios (MPD outflows / Census commuter
+#' benchmark per origin), not the population coverage score $p_i$ from v04.
 plot_activity_combo_coverage <- function(activity_combo_coverage_combined, highlight_filter = NULL) {
   days_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
@@ -238,10 +186,10 @@ plot_activity_combo_coverage <- function(activity_combo_coverage_combined, highl
       limits = c(0, 2),
       oob = scales::squish,
       na.value = "gray90",
-      name = "Median Coverage\n< 1 underrepresented\n> 1 overrepresented"
+      name = "Median Flow Coverage Ratio\n< 1 underrepresented\n> 1 overrepresented"
     ) +
     ggplot2::labs(
-      title = "Coverage by Purpose-Filter Combination",
+      title = "Flow Coverage Ratio by Purpose-Filter Combination",
       subtitle = "All destination-purpose subsets; activity at origin = Home",
       x = "Day of week",
       y = "Destination filters",
@@ -261,16 +209,16 @@ plot_activity_combo_coverage <- function(activity_combo_coverage_combined, highl
     )
 }
 
-#' Plot Daily Generation Residuals (Standardized User Count)
-plot_daily_generation_residuals <- function(generation_residuals_combined) {
+#' Plot Standardized User-Count Residuals (debiasR Level-2 marginal validation)
+plot_user_count_residuals <- function(user_count_residuals_combined) {
   days_order <- rev(c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
-  generation_residuals_combined$day <- factor(generation_residuals_combined$day, levels = days_order)
+  user_count_residuals_combined$day <- factor(user_count_residuals_combined$day, levels = days_order)
 
-  generation_residuals_combined <- generation_residuals_combined |>
+  user_count_residuals_combined <- user_count_residuals_combined |>
     dplyr::mutate(day_type = ifelse(day %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
 
   # Remove NAs
-  plot_data <- generation_residuals_combined |>
+  plot_data <- user_count_residuals_combined |>
     dplyr::filter(!is.na(standardized_user_count_residual))
 
   # Limit y-axis limits to 99th percentile to avoid massive outliers ruining the plot
@@ -287,9 +235,9 @@ plot_daily_generation_residuals <- function(generation_residuals_combined) {
     scale_x_discrete(labels = rev(c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))) +
     scale_fill_manual(values = c("Weekday" = "#1F78B4", "Weekend" = "#E31A1C")) +
     labs(
-      title = "Generation Residuals",
-      subtitle = "Standardized User Count Residual (0 = Expected Generation)",
-      y = "Standardized Residual",
+      title = "Standardized User-Count Residuals (Origin)",
+      subtitle = "0 = expected origin coverage",
+      y = "Standardized user-count residual",
       x = "Day of\nWeek",
       caption = "Data Source: MITMS flows vs. ECEPOV (Origin Totals)"
     ) +
@@ -323,17 +271,82 @@ plot_method_comparison <- function(comparison_df) {
     scale_fill_manual(values = c("MAE" = "#4DAF4A", "RMSE" = "#377EB8")) +
     labs(
       title = "Bias Adjustment Performance",
-      subtitle = "Comparison of Mean Absolute Error (MAE) and RMSE across methods",
+      subtitle = "Origin-marginal fit (MAE, RMSE)",
       x = "Adjustment Method",
       y = "Error (Trips)",
       fill = "Metric",
-      caption = "Lower values indicate better alignment with Census benchmark"
+      caption = "Lower values indicate better alignment with origin commuter benchmark"
     ) +
     theme(
       legend.position = "top",
       axis.title.y = element_text(face = "bold"),
       axis.title.x = element_text(face = "bold"),
       plot.title = element_text(face = "bold", size = 24)
+    )
+}
+
+#' Map of areas with |median coverage_bias| > threshold
+#'
+#' @param pop_coverage_combined Combined population-coverage table with `day`,
+#'   `origin`, `coverage_bias`.
+#' @param zones_raw sf object with `id` and geometry.
+#' @param day_type "Weekday" or "Weekend".
+#' @param threshold Absolute median coverage_bias cutoff.
+plot_outlier_map <- function(pop_coverage_combined, zones_raw,
+                             day_type = c("Weekday", "Weekend"),
+                             threshold = 0.3) {
+  day_type <- match.arg(day_type)
+  weekend_days <- c("Saturday", "Sunday")
+
+  # Spain-only zones (drop FR/PT cross-border municipalities included upstream).
+  # esp_move_can() shifts every geometry in its input, so apply it only to the
+  # Canary subset. Canary provinces use INE codes 35 (Las Palmas) and 38 (Santa
+  # Cruz de Tenerife). Work in EPSG:4258 so the can_box inset stays rectilinear.
+  zones_es_all <- zones_raw |>
+    dplyr::filter(grepl("^[0-9]", id)) |>
+    sf::st_transform(4258)
+  is_canary <- grepl("^(35|38)", zones_es_all$id)
+  zones_can <- mapSpain::esp_move_can(zones_es_all[is_canary, ])
+  zones_es <- rbind(zones_es_all[!is_canary, ], zones_can)
+  can_box <- mapSpain::esp_get_can_box()
+
+  per_origin <- pop_coverage_combined |>
+    dplyr::mutate(.dt = ifelse(day %in% weekend_days, "Weekend", "Weekday")) |>
+    dplyr::filter(.dt == !!day_type) |>
+    dplyr::summarise(
+      peak_bias = coverage_bias[which.max(abs(coverage_bias))],
+      .by = origin
+    ) |>
+    dplyr::filter(grepl("^[0-9]", origin))
+
+  outliers <- per_origin |>
+    dplyr::filter(abs(peak_bias) > !!threshold)
+
+  zones_outliers <- zones_es |>
+    dplyr::inner_join(outliers, by = c("id" = "origin"))
+
+  ggplot() +
+    geom_sf(data = zones_es, fill = "gray95", color = "gray80", linewidth = 0.05) +
+    geom_sf(data = can_box, color = "gray40", linewidth = 0.3) +
+    geom_sf(data = zones_outliers, aes(fill = peak_bias), color = "black", linewidth = 0.2) +
+    scale_fill_gradient2(
+      low = "#2166AC", mid = "white", high = "#B2182B",
+      midpoint = 0, limits = c(-1, 1),
+      name = expression("Peak " * b[i])
+    ) +
+    labs(
+      title = paste0(day_type, " outliers"),
+      subtitle = bquote("Areas with |peak " * b[i] * "| > " * .(threshold) *
+                          " (" * .(nrow(outliers)) * " of " * .(nrow(per_origin)) * ")")
+    ) +
+    theme_minimal(base_size = 20) +
+    theme(
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank(),
+      plot.title = element_text(face = "bold", size = 28),
+      plot.subtitle = element_text(size = 18, color = "gray40"),
+      legend.position = "right"
     )
 }
 
@@ -389,4 +402,295 @@ plot_margin_diagnostic <- function(mpd_combined, adj_combined, benchmark_clean) 
       caption = "Diagonal line represents perfect match. Points below the line indicate under-coverage."
     ) +
     theme(strip.text = element_text(face = "bold", size = 16))
+}
+
+#' Plot Level 3 Residual Heatmap (Origin Marginals)
+plot_level3_heatmap <- function(mpd_combined, target_adj_raking_combined, target_adj_inv_pen_combined, target_adj_selection_income_combined, target_adj_selection_mean_age_combined, target_adj_selection_pct_under18_combined, target_adj_selection_pct_over65_combined, target_adj_selection_pct_spanish_combined, target_adj_selection_gini_combined, target_adj_multilevel_combined, benchmark_clean) {
+  
+  aggregate_to_origins <- function(df, flow_col = "flow_adj") {
+    df |>
+      dplyr::group_by(origin) |>
+      dplyr::summarise(flow_adj = sum(.data[[flow_col]], na.rm = TRUE), .groups = "drop") |>
+      dplyr::mutate(origin = as.character(origin), destination = origin)
+  }
+  
+  mpd_origin <- aggregate_to_origins(mpd_combined, "flow") |> dplyr::rename(flow_mpd = flow_adj)
+  adj_raking <- aggregate_to_origins(target_adj_raking_combined)
+  adj_inv_pen <- aggregate_to_origins(target_adj_inv_pen_combined)
+  adj_sel_inc <- aggregate_to_origins(target_adj_selection_income_combined)
+  adj_sel_age <- aggregate_to_origins(target_adj_selection_mean_age_combined)
+  adj_sel_u18 <- aggregate_to_origins(target_adj_selection_pct_under18_combined)
+  adj_sel_o65 <- aggregate_to_origins(target_adj_selection_pct_over65_combined)
+  adj_sel_spa <- aggregate_to_origins(target_adj_selection_pct_spanish_combined)
+  adj_sel_gin <- aggregate_to_origins(target_adj_selection_gini_combined)
+  adj_multi <- aggregate_to_origins(target_adj_multilevel_combined)
+  
+  bench_origin <- benchmark_clean |>
+    dplyr::transmute(
+      origin = as.character(origin),
+      destination = origin,
+      flow_bench = as.numeric(target)
+    )
+    
+  # Create a combined comparison dataset
+  build_method_comparison <- function(adj_df, method_name) {
+    adj_df |>
+      dplyr::inner_join(mpd_origin, by = c("origin", "destination")) |>
+      dplyr::inner_join(bench_origin, by = c("origin", "destination")) |>
+      dplyr::mutate(method_label = method_name)
+  }
+  
+  flow_comparison <- dplyr::bind_rows(
+    build_method_comparison(adj_raking, "Raking Ratio"),
+    build_method_comparison(adj_inv_pen, "Inverse Penetration"),
+    build_method_comparison(adj_sel_inc, "Sel. Rate (Net Income)"),
+    build_method_comparison(adj_sel_age, "Sel. Rate (Mean Age)"),
+    build_method_comparison(adj_sel_u18, "Sel. Rate (% <18)"),
+    build_method_comparison(adj_sel_o65, "Sel. Rate (% >65)"),
+    build_method_comparison(adj_sel_spa, "Sel. Rate (% Native)"),
+    build_method_comparison(adj_sel_gin, "Sel. Rate (Gini)"),
+    build_method_comparison(adj_multi, "Multilevel Model")
+  )
+  
+  # Calculate standard deviation of residuals
+  adjusted_reference_sd <- flow_comparison |>
+    dplyr::mutate(residual = flow_adj - flow_bench) |>
+    dplyr::pull(residual) |>
+    stats::sd(na.rm = TRUE)
+    
+  if (!is.finite(adjusted_reference_sd) || adjusted_reference_sd <= 0) {
+    adjusted_reference_sd <- 1
+  }
+
+  raw_reference <- flow_comparison |>
+    dplyr::select(origin, destination, flow_mpd, flow_bench) |>
+    dplyr::distinct() |>
+    dplyr::transmute(
+      method_label = "Unadjusted (Raw MPD)",
+      residual = flow_mpd - flow_bench
+    )
+    
+  adj_reference <- flow_comparison |>
+    dplyr::transmute(
+      method_label = method_label,
+      residual = flow_adj - flow_bench
+    )
+    
+  residual_data <- dplyr::bind_rows(raw_reference, adj_reference) |>
+    dplyr::mutate(
+      residual_sd_score = abs(residual) / adjusted_reference_sd,
+      residual_band = dplyr::case_when(
+        residual_sd_score > 4 ~ "Greater than 4.0 SD",
+        residual_sd_score > 3 ~ "3.0 to 4.0 SD",
+        residual_sd_score > 2 ~ "2.0 to 3.0 SD",
+        TRUE ~ "Less than 2.0 SD"
+      )
+    )
+
+  method_levels <- c("Unadjusted (Raw MPD)", "Raking Ratio", "Inverse Penetration", "Sel. Rate (Net Income)", "Sel. Rate (Mean Age)", "Sel. Rate (% <18)", "Sel. Rate (% >65)", "Sel. Rate (% Native)", "Sel. Rate (Gini)", "Multilevel Model")
+  band_levels <- c("Less than 2.0 SD", "2.0 to 3.0 SD", "3.0 to 4.0 SD", "Greater than 4.0 SD")
+
+  heatmap_data <- residual_data |>
+    dplyr::count(method_label, residual_band, name = "n") |>
+    dplyr::group_by(method_label) |>
+    dplyr::mutate(share = 100 * n / sum(n)) |>
+    dplyr::ungroup()
+    
+  complete_grid <- expand.grid(
+    method_label = method_levels,
+    residual_band = band_levels,
+    stringsAsFactors = FALSE
+  )
+  
+  heatmap_data <- complete_grid |>
+    dplyr::left_join(heatmap_data, by = c("method_label", "residual_band")) |>
+    dplyr::mutate(
+      n = dplyr::if_else(is.na(n), 0L, n),
+      share = dplyr::if_else(is.na(share), 0, share),
+      method_label = factor(method_label, levels = method_levels),
+      residual_band = factor(residual_band, levels = band_levels),
+      label = sprintf("%.2f", share)
+    )
+
+  ggplot2::ggplot(
+    heatmap_data,
+    ggplot2::aes(x = method_label, y = residual_band, fill = share)
+  ) +
+    ggplot2::geom_tile(width = 0.92, height = 0.92, colour = NA) +
+    ggplot2::geom_text(ggplot2::aes(label = label), colour = "black", size = 4) +
+    ggplot2::scale_fill_gradient(
+      low = "#F7F7F7",
+      high = "#08519C",
+      name = "Share (%)"
+    ) +
+    ggplot2::scale_x_discrete(position = "bottom", guide = ggplot2::guide_axis(n.dodge = 2)) +
+    ggplot2::labs(
+      x = NULL,
+      y = "Residual Standard Deviation Band",
+      title = "Origin-Marginal Residual Heatmap",
+      subtitle = "Percentage of origins in each residual standard deviation band"
+    ) +
+    ggplot2::theme_minimal(base_size = 14) +
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(),
+      panel.border = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_text(colour = "grey45", face = "bold"),
+      axis.text.x = ggplot2::element_text(colour = "grey20", face = "bold"),
+      axis.ticks = ggplot2::element_blank(),
+      legend.position = "none"
+    )
+}
+
+#' Plot Level 3 Residual Stacked Bar (Origin Marginals)
+plot_level3_stacked_bar <- function(mpd_combined, target_adj_raking_combined, target_adj_inv_pen_combined, target_adj_selection_income_combined, target_adj_selection_mean_age_combined, target_adj_selection_pct_under18_combined, target_adj_selection_pct_over65_combined, target_adj_selection_pct_spanish_combined, target_adj_selection_gini_combined, target_adj_multilevel_combined, benchmark_clean, highlight_methods = NULL) {
+  
+  aggregate_to_origins <- function(df, flow_col = "flow_adj") {
+    df |>
+      dplyr::group_by(origin) |>
+      dplyr::summarise(flow_adj = sum(.data[[flow_col]], na.rm = TRUE), .groups = "drop") |>
+      dplyr::mutate(origin = as.character(origin), destination = origin)
+  }
+  
+  mpd_origin <- aggregate_to_origins(mpd_combined, "flow") |> dplyr::rename(flow_mpd = flow_adj)
+  adj_raking <- aggregate_to_origins(target_adj_raking_combined)
+  adj_inv_pen <- aggregate_to_origins(target_adj_inv_pen_combined)
+  adj_sel_inc <- aggregate_to_origins(target_adj_selection_income_combined)
+  adj_sel_age <- aggregate_to_origins(target_adj_selection_mean_age_combined)
+  adj_sel_u18 <- aggregate_to_origins(target_adj_selection_pct_under18_combined)
+  adj_sel_o65 <- aggregate_to_origins(target_adj_selection_pct_over65_combined)
+  adj_sel_spa <- aggregate_to_origins(target_adj_selection_pct_spanish_combined)
+  adj_sel_gin <- aggregate_to_origins(target_adj_selection_gini_combined)
+  adj_multi <- aggregate_to_origins(target_adj_multilevel_combined)
+  
+  bench_origin <- benchmark_clean |>
+    dplyr::transmute(
+      origin = as.character(origin),
+      destination = origin,
+      flow_bench = as.numeric(target)
+    )
+    
+  # Create a combined comparison dataset
+  build_method_comparison <- function(adj_df, method_name) {
+    adj_df |>
+      dplyr::inner_join(mpd_origin, by = c("origin", "destination")) |>
+      dplyr::inner_join(bench_origin, by = c("origin", "destination")) |>
+      dplyr::mutate(method_label = method_name)
+  }
+  
+  flow_comparison <- dplyr::bind_rows(
+    build_method_comparison(adj_raking, "Raking Ratio"),
+    build_method_comparison(adj_inv_pen, "Inverse Penetration"),
+    build_method_comparison(adj_sel_inc, "Sel. Rate (Net Income)"),
+    build_method_comparison(adj_sel_age, "Sel. Rate (Mean Age)"),
+    build_method_comparison(adj_sel_u18, "Sel. Rate (% <18)"),
+    build_method_comparison(adj_sel_o65, "Sel. Rate (% >65)"),
+    build_method_comparison(adj_sel_spa, "Sel. Rate (% Native)"),
+    build_method_comparison(adj_sel_gin, "Sel. Rate (Gini)"),
+    build_method_comparison(adj_multi, "Multilevel Model")
+  )
+  
+  # Calculate standard deviation of Raking Ratio residuals as reference SD
+  adjusted_reference_sd <- flow_comparison |>
+    dplyr::filter(method_label == "Raking Ratio") |>
+    dplyr::mutate(residual = flow_adj - flow_bench) |>
+    dplyr::pull(residual) |>
+    stats::sd(na.rm = TRUE)
+    
+  if (!is.finite(adjusted_reference_sd) || adjusted_reference_sd <= 0) {
+    adjusted_reference_sd <- 1
+  }
+
+  raw_reference <- flow_comparison |>
+    dplyr::select(origin, destination, flow_mpd, flow_bench) |>
+    dplyr::distinct() |>
+    dplyr::transmute(
+      method_label = "Unadjusted (Raw MPD)",
+      residual = flow_mpd - flow_bench
+    )
+    
+  adj_reference <- flow_comparison |>
+    dplyr::transmute(
+      method_label = method_label,
+      residual = flow_adj - flow_bench
+    )
+    
+  residual_data <- dplyr::bind_rows(raw_reference, adj_reference) |>
+    dplyr::mutate(
+      residual_sd_score = abs(residual) / adjusted_reference_sd,
+      residual_band = dplyr::case_when(
+        residual_sd_score > 4 ~ "Greater than 4.0 SD",
+        residual_sd_score > 3 ~ "3.0 to 4.0 SD",
+        residual_sd_score > 2 ~ "2.0 to 3.0 SD",
+        TRUE ~ "Less than 2.0 SD"
+      )
+    )
+
+  method_levels <- c("Unadjusted (Raw MPD)", "Raking Ratio", "Inverse Penetration", "Sel. Rate (Net Income)", "Sel. Rate (Mean Age)", "Sel. Rate (% <18)", "Sel. Rate (% >65)", "Sel. Rate (% Native)", "Sel. Rate (Gini)", "Multilevel Model")
+  band_levels <- c("Less than 2.0 SD", "2.0 to 3.0 SD", "3.0 to 4.0 SD", "Greater than 4.0 SD")
+
+  heatmap_data <- residual_data |>
+    dplyr::count(method_label, residual_band, name = "n") |>
+    dplyr::group_by(method_label) |>
+    dplyr::mutate(share = 100 * n / sum(n)) |>
+    dplyr::ungroup()
+    
+  complete_grid <- expand.grid(
+    method_label = method_levels,
+    residual_band = band_levels,
+    stringsAsFactors = FALSE
+  )
+  
+  heatmap_data <- complete_grid |>
+    dplyr::left_join(heatmap_data, by = c("method_label", "residual_band")) |>
+    dplyr::mutate(
+      n = dplyr::if_else(is.na(n), 0L, n),
+      share = dplyr::if_else(is.na(share), 0, share),
+      method_label = factor(method_label, levels = method_levels),
+      residual_band = factor(residual_band, levels = band_levels),
+      label = sprintf("%.1f", share),
+      is_highlighted = if (is.null(highlight_methods)) "no" else ifelse(method_label %in% highlight_methods, "yes", "no")
+    )
+
+  ggplot2::ggplot(
+    heatmap_data,
+    ggplot2::aes(x = method_label, y = share, fill = residual_band)
+  ) +
+    ggplot2::geom_col(ggplot2::aes(colour = is_highlighted), width = 0.8, linewidth = 1.2) +
+    ggplot2::geom_text(
+      ggplot2::aes(label = ifelse(residual_band == "Less than 2.0 SD", label, "")), 
+      position = ggplot2::position_stack(vjust = 0.5), 
+      size = 6,
+      colour = "grey10"
+    ) +
+    ggplot2::scale_colour_manual(values = c("yes" = "black", "no" = NA), guide = "none") +
+    ggplot2::scale_fill_manual(
+      values = c(
+        "Less than 2.0 SD" = "#A8D5BA",    # Soft Green (Good)
+        "2.0 to 3.0 SD" = "#F9E79F",       # Soft Yellow (Warning)
+        "3.0 to 4.0 SD" = "#F5B041",       # Orange (Bad)
+        "Greater than 4.0 SD" = "#E74C3C"  # Red (Very Bad)
+      ),
+      name = "Residual SD Band"
+    ) +
+    ggplot2::scale_y_continuous(labels = function(x) paste0(x, "%")) +
+    ggplot2::scale_x_discrete(limits = rev) + # Reverse so Unadjusted is at the top
+    ggplot2::coord_flip() +
+    ggplot2::labs(
+      x = NULL,
+      y = "Share of Municipalities",
+      title = "Origin-Marginal Residuals by SD Band",
+      subtitle = "Percentage of municipalities falling into each error magnitude category"
+    ) +
+    ggplot2::theme_minimal(base_size = 20) +
+    ggplot2::theme(
+      legend.position = "right",
+      axis.text.y = ggplot2::element_text(colour = "grey20", face = "bold", size = 16),
+      axis.text.x = ggplot2::element_text(colour = "grey20", size = 16),
+      plot.title = ggplot2::element_text(face = "bold", size = 24),
+      plot.subtitle = ggplot2::element_text(size = 18, colour = "grey30"),
+      legend.title = ggplot2::element_text(face = "bold", size = 18),
+      legend.text = ggplot2::element_text(size = 16),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.grid.major.y = ggplot2::element_blank() # Clean up horizontal lines
+    )
 }

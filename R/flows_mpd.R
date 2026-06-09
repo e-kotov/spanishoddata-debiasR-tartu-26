@@ -1,7 +1,6 @@
 #' Fetch Mobile Phone Mobility Data
 fetch_mpd <- function(
   dates,
-  hourly = FALSE,
   purposes = c("work_or_study", "infrequent_activity"),
   group_activities = FALSE
 ) {
@@ -20,9 +19,6 @@ fetch_mpd <- function(
 
   # Grouping columns
   group_cols <- c("id_origin", "id_destination")
-  if (hourly) {
-    group_cols <- c(group_cols, "hour")
-  }
   if (group_activities) {
     group_cols <- c(group_cols, "activity_origin", "activity_destination")
   }
@@ -55,9 +51,6 @@ clean_mpd <- function(mpd_raw) {
       mpd_source = "MITMS"
     )
 
-  if ("hour" %in% colnames(mpd_raw)) {
-    res$hour <- mpd_raw$hour
-  }
   if ("activity_origin" %in% colnames(mpd_raw)) {
     res$activity_origin <- mpd_raw$activity_origin
   }
