@@ -304,3 +304,89 @@ plot_daily_generation_residuals <- function(generation_residuals_combined) {
       axis.text = element_text(color = "black")
     )
 }
+
+#' Plot Adjustment Comparison (Method Performance)
+plot_method_comparison <- function(comparison_df) {
+  # Clean up column names if needed
+  comparison_df <- as.data.frame(comparison_df)
+  
+  # Pivot to long format for ggplot
+  plot_data <- comparison_df |>
+    dplyr::select(method, mae, rmse) |>
+    tidyr::pivot_longer(cols = c(mae, rmse), names_to = "metric", values_to = "value") |>
+    dplyr::mutate(metric = toupper(metric))
+
+  ggplot(plot_data, aes(x = reorder(method, value), y = value, fill = metric)) +
+    geom_col(position = "dodge") +
+    coord_flip() +
+    theme_minimal(base_size = 20) +
+    scale_fill_manual(values = c("MAE" = "#4DAF4A", "RMSE" = "#377EB8")) +
+    labs(
+      title = "Bias Adjustment Performance",
+      subtitle = "Comparison of Mean Absolute Error (MAE) and RMSE across methods",
+      x = "Adjustment Method",
+      y = "Error (Trips)",
+      fill = "Metric",
+      caption = "Lower values indicate better alignment with Census benchmark"
+    ) +
+    theme(
+      legend.position = "top",
+      axis.title.y = element_text(face = "bold"),
+      axis.title.x = element_text(face = "bold"),
+      plot.title = element_text(face = "bold", size = 24)
+    )
+}
+
+#' Plot Marginal Adjustment Diagnostic Scatter (Origin Totals)
+plot_margin_diagnostic <- function(mpd_combined, adj_combined, benchmark_clean) {
+  # Aggregate raw MPD to origin margins
+  raw_margins <- mpd_combined |>
+    dplyr::group_by(origin) |>
+    dplyr::summarise(compared = sum(flow, na.rm = TRUE), .groups = "drop") |>
+    dplyr::inner_join(benchmark_clean, by = "origin") |>
+    dplyr::transmute(
+      origin,
+      reference = target,
+      compared,
+      type = "Raw vs Benchmark"
+    )
+    
+  # Aggregate Adjusted to origin margins
+  adj_margins <- adj_combined |>
+    dplyr::group_by(origin) |>
+    dplyr::summarise(compared = sum(flow_adj, na.rm = TRUE), .groups = "drop") |>
+    dplyr::inner_join(benchmark_clean, by = "origin") |>
+    dplyr::transmute(
+      origin,
+      reference = target,
+      compared,
+      type = "Adjusted vs Benchmark"
+    )
+    
+  plot_data <- dplyr::bind_rows(raw_margins, adj_margins) |>
+    dplyr::mutate(difference = compared - reference)
+    
+  # Determine limits for squared plot
+  max_val <- max(c(plot_data$reference, plot_data$compared), na.rm = TRUE)
+    
+  ggplot(plot_data, aes(x = reference, y = compared, color = difference)) +
+    geom_point(alpha = 0.6, size = 2) +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#D95F0E", linewidth = 1) +
+    facet_wrap(~type) +
+    scale_color_gradient2(
+      low = "#2166AC", mid = "gray88", high = "#B2182B", 
+      midpoint = 0, name = "Residual\n(Trips)"
+    ) +
+    scale_x_continuous(labels = scales::comma, limits = c(0, max_val)) +
+    scale_y_continuous(labels = scales::comma, limits = c(0, max_val)) +
+    coord_fixed() +
+    theme_minimal(base_size = 18) +
+    labs(
+      title = "Origin Marginal Validation",
+      subtitle = "Total Generated Trips: Observed (Y) vs. Census Benchmark (X)",
+      x = "Census Benchmark (Total Commuters)",
+      y = "Mobile Data (Total Outbound Flow)",
+      caption = "Diagonal line represents perfect match. Points below the line indicate under-coverage."
+    ) +
+    theme(strip.text = element_text(face = "bold", size = 16))
+}

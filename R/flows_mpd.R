@@ -9,7 +9,14 @@ fetch_mpd <- function(
   res <- spanishoddata::spod_get(type = "od", zones = "muni", dates = dates, max_download_size_gb = 5)
 
   # Calculate number of days in the range
-  num_days <- as.numeric(as.Date(dates["end"]) - as.Date(dates["start"])) + 1
+  if (!is.null(names(dates)) && all(c("start", "end") %in% names(dates))) {
+    num_days <- as.numeric(as.Date(dates["end"]) - as.Date(dates["start"])) + 1
+  } else if (is.data.frame(dates) && all(c("date_start", "date_end") %in% colnames(dates))) {
+    num_days <- as.numeric(as.Date(dates$date_end[1]) - as.Date(dates$date_start[1])) + 1
+  } else {
+    # Assume single date or character vector
+    num_days <- length(unique(dates))
+  }
 
   # Grouping columns
   group_cols <- c("id_origin", "id_destination")
@@ -45,7 +52,7 @@ clean_mpd <- function(mpd_raw) {
       origin = as.character(id_origin),
       destination = as.character(id_destination),
       flow = as.numeric(flow),
-      mpd_source = "Orange"
+      mpd_source = "MITMS"
     )
 
   if ("hour" %in% colnames(mpd_raw)) {

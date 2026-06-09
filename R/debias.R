@@ -168,3 +168,17 @@ measure_generation_residuals <- function(merged_dataset_or_df) {
   # Extract the area-level residual table
   res$area_level
 }
+
+#' Prep benchmark totals as a dummy OD table for debiasR
+prep_benchmark_for_adjustment <- function(benchmark_clean) {
+  # debiasR adjustment functions expect an OD matrix even for marginal calibration.
+  # Since we only have origin totals, we create a dummy self-loop OD matrix
+  # where destination = origin, which allows the package functions to function
+  # correctly using 'origin' calibration.
+  benchmark_clean |>
+    dplyr::transmute(
+      origin = as.character(origin),
+      destination = as.character(origin), # Dummy destination
+      flow = as.numeric(target)
+    )
+}

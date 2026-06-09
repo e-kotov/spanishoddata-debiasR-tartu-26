@@ -113,3 +113,15 @@ format:
 ## Generation Residuals (March 2023)
 
 ![](../figures/daily_generation_residuals_march_2023.png){fig-align="center"}
+
+## Bias Adjustment Performance
+
+![](../figures/adjustment_method_comparison_march_2023.png){fig-align="center"}
+
+<!-- ### Key Findings
+- **Selection Rate (Income)** provided the best correction, reducing Mean Absolute Error (MAE) by ~6%.
+- **Multilevel Model** requires more granular destination-side covariates to improve upon the base capture rates. -->
+
+## Origin Marginal Validation
+
+![](../figures/margin_diagnostic_scatter.png){fig-align="center"}
