@@ -262,10 +262,21 @@ plot_method_comparison <- function(comparison_df) {
   plot_data <- comparison_df |>
     dplyr::select(method, mae, rmse) |>
     tidyr::pivot_longer(cols = c(mae, rmse), names_to = "metric", values_to = "value") |>
-    dplyr::mutate(metric = toupper(metric))
+    dplyr::mutate(
+      metric = toupper(metric),
+      is_highlighted = ifelse(method == "Raw (Unadjusted)", "yes", "no")
+    )
 
-  ggplot(plot_data, aes(x = reorder(method, value), y = value, fill = metric)) +
-    geom_col(position = "dodge") +
+  # Reorder method by value
+  plot_data$method <- reorder(plot_data$method, plot_data$value)
+  
+  # Determine font faces for the y-axis labels
+  y_faces <- ifelse(levels(plot_data$method) == "Raw (Unadjusted)", "bold", "plain")
+
+  ggplot(plot_data, aes(x = method, y = value, fill = metric)) +
+    geom_col(aes(colour = is_highlighted, linewidth = is_highlighted), position = position_dodge(width = 0.9)) +
+    scale_colour_manual(values = c("yes" = "black", "no" = "transparent"), guide = "none") +
+    scale_linewidth_manual(values = c("yes" = 1.2, "no" = 0), guide = "none") +
     coord_flip() +
     theme_minimal(base_size = 20) +
     scale_fill_manual(values = c("MAE" = "#4DAF4A", "RMSE" = "#377EB8")) +
@@ -281,6 +292,7 @@ plot_method_comparison <- function(comparison_df) {
       legend.position = "top",
       axis.title.y = element_text(face = "bold"),
       axis.title.x = element_text(face = "bold"),
+      axis.text.y = element_text(face = y_faces),
       plot.title = element_text(face = "bold", size = 24)
     )
 }
